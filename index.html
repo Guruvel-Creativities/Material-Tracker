@@ -2,8 +2,8 @@
 <html>
 <head>
   <title>QR Test</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsPDF/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js"></script>
 </head>
 <body>
   <button onclick="generateMultipleQRCodes()">📄 Generate QR Codes</button>
@@ -15,7 +15,7 @@
       let count = parseInt(prompt("How many QR codes to generate?"));
       if (isNaN(count) || count <= 0) return;
 
-      const { jsPDF } = window.jspdf;
+      const jsPDF = window.jspdf.jsPDF;
       const doc = new jsPDF();
       let margin = 10, size = 40, x = margin, y = margin;
       let perRow = 3, promises = [];

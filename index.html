@@ -3,29 +3,32 @@
 <head>
   <title>Guruvel Creativities Inventory</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <!-- Working CDNs -->
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
-    body { font-family: sans-serif; padding: 20px; max-width: 700px; margin: auto; text-align: center; }
+    body { font-family: sans-serif; padding: 20px; max-width: 800px; margin: auto; }
     .btn { padding: 10px 15px; margin: 5px; font-size: 16px; }
-    .list { margin-top: 20px; text-align: left; }
+    .list { margin-top: 20px; }
     .list div { margin: 5px 0; }
-    img.logo { width: 120px; height: auto; margin-bottom: 10px; }
+    img.logo { width: 100px; }
   </style>
 </head>
 <body>
-  <!-- Logo and Title -->
-  <img src="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgra2sfgJ1ZE0ub9g2_geCiFkRrdEhgzI_LQ7qkySYRO9ss4QHHWGTL-HlniFl5AuPq5uu7gtQKvrgyregnbofmhQau5V6kWzcwQcj7G-Wpl2tIXPIfEKOLUbX781JbJbNiQ04dK-Q1TzBS/s268/Screenshot+%25284%2529.png" class="logo" alt="Logo">
+  <img class="logo" src="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgra2sfgJ1ZE0ub9g2_geCiFkRrdEhgzI_LQ7qkySYRO9ss4QHHWGTL-HlniFl5AuPq5uu7gtQKvrgyregnbofmhQau5V6kWzcwQcj7G-Wpl2tIXPIfEKOLUbX781JbJbNiQ04dK-Q1TzBS/s268/Screenshot+%25284%2529.png"/>
   <h2>📦 Guruvel Creativities Inventory</h2>
-
-  <!-- Action Buttons -->
   <button class="btn" onclick="startScan('add')">➕ Add Stock</button>
   <button class="btn" onclick="startScan('consume')">➖ Consume</button>
   <button class="btn" onclick="generateMultipleQRCodes()">📄 Generate QR Codes</button>
-  <button class="btn" onclick="exportHistory()">📥 Export History</button>
+  <button class="btn" onclick="exportHistoryToExcel()">📤 Export History</button>
+  <button class="btn" onclick="resetHistory()">🗑️ Reset History</button>
+  <input type="date" id="filterDate">
+  <select id="filterType">
+    <option value="">All</option>
+    <option value="Add">Add</option>
+    <option value="Consume">Consume</option>
+  </select>
+  <button class="btn" onclick="exportFilteredHistory()">📁 Export Filtered</button>
 
   <div id="reader" style="width: 100%; margin-top: 20px;"></div>
   <button class="btn" id="backButton" style="display: none;" onclick="stopScan()">Go Back</button>
@@ -37,10 +40,13 @@
 
   <script>
     let db = JSON.parse(localStorage.getItem('materialDB') || '{}');
+    let historyLog = JSON.parse(localStorage.getItem('materialHistory') || '[]');
     let html5QrCode;
+    let lastSerialNum = parseInt(localStorage.getItem('lastSerial') || '0');
 
     function saveDB() {
       localStorage.setItem('materialDB', JSON.stringify(db));
+      localStorage.setItem('materialHistory', JSON.stringify(historyLog));
       renderList();
     }
 
@@ -59,11 +65,10 @@
       document.getElementById("backButton").style.display = "inline";
       html5QrCode = new Html5Qrcode("reader");
       Html5Qrcode.getCameras().then(devices => {
-        if (devices && devices.length) {
-          let backCamera = devices.find(device => device.label.toLowerCase().includes("back"));
-          const cameraId = backCamera ? backCamera.id : devices[0].id;
+        if (devices.length) {
+          const backCamera = devices.find(d => d.label.toLowerCase().includes("back")) || devices[0];
           html5QrCode.start(
-            cameraId,
+            backCamera.id,
             { fps: 10, qrbox: 250 },
             qrCodeMessage => {
               html5QrCode.stop();
@@ -79,121 +84,114 @@
         html5QrCode.stop().then(() => {
           document.getElementById("backButton").style.display = "none";
           document.getElementById("reader").innerHTML = "";
-        }).catch(err => alert("Error stopping scanner: " + err));
+        });
       }
     }
 
     function handleScan(serial, mode) {
       serial = serial.trim();
-      let action = '';
-      let timestamp = new Date().toLocaleString();
+      const now = new Date().toLocaleString();
 
       if (mode === 'add') {
-        if (db[serial]) {
-          alert('Already added.');
-          return;
-        }
-        let material = prompt("Enter material name:", "NodeMCU");
+        if (db[serial]) return alert('Already added.');
+        let material = prompt("Enter or select material name:", "NodeMCU");
         if (material) {
           db[serial] = material.trim();
+          historyLog.push({ date: now, type: 'Add', id: serial, material });
           saveDB();
-          alert(`✅ Added: ${material}`);
-          action = 'add';
+          alert('Material added successfully.');
         }
       } else if (mode === 'consume') {
-        if (!db[serial]) {
-          alert('Serial not found.');
-          return;
-        }
-        let material = db[serial];
+        if (!db[serial]) return alert('Serial not found.');
+        historyLog.push({ date: now, type: 'Consume', id: serial, material: db[serial] });
         delete db[serial];
         saveDB();
-        alert(`🗑️ Consumed: ${material}`);
-        action = 'consume';
-      }
-
-      if (action) {
-        let history = JSON.parse(localStorage.getItem('history') || '[]');
-        history.push({ serial, action, timestamp });
-        localStorage.setItem('history', JSON.stringify(history));
+        alert('Material consumed successfully.');
       }
     }
 
-    let lastSerialNum = parseInt(localStorage.getItem('lastSerial') || '0');
+    function generateMultipleQRCodes() {
+      let count = parseInt(prompt("How many QR codes to generate?"));
+      if (isNaN(count) || count <= 0) return alert("Invalid number.");
 
-async function generateMultipleQRCodes() {
-  let count = parseInt(prompt("How many QR codes to generate?"));
-  if (isNaN(count) || count <= 0) {
-    alert("Invalid number.");
-    return;
-  }
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ unit: "mm", format: [110, 150] });
+      let margin = 10, size = 20, space = 10;
+      let x = margin, y = margin;
+      let perRow = 4;
 
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({
-    orientation: 'portrait',
-    unit: 'mm',
-    format: [110, 150]  // Custom page size
-  });
+      let promises = [];
 
-  let margin = 10;
-  let qrSize = 20;
-  let spacingX = 10;
-  let spacingY = 15;
-  let labelHeight = 6;
-  let x = margin;
-  let y = margin;
+      for (let i = 1; i <= count; i++) {
+        let serialNum = lastSerialNum + i;
+        let serialId = `ID${serialNum.toString().padStart(3, '0')}`;
 
-  const usableWidth = 110 - 2 * margin;
-  const usableHeight = 150 - 2 * margin;
-  const stepX = qrSize + spacingX;
-  const stepY = qrSize + labelHeight + spacingY;
-
-  const perRow = Math.floor(usableWidth / stepX);
-
-  for (let i = 1; i <= count; i++) {
-    let serialNum = lastSerialNum + i;
-    let serialId = `ID${serialNum.toString().padStart(3, '0')}`;
-    let url = await QRCode.toDataURL(serialId);
-
-    doc.addImage(url, 'PNG', x, y, qrSize, qrSize);
-
-    // Centered text
-    let textWidth = doc.getTextWidth(serialId);
-    let centerX = x + qrSize / 2 - textWidth / 2;
-    doc.text(serialId, centerX, y + qrSize + 5);
-
-    // Move to next position
-    x += stepX;
-
-    if ((i % perRow) === 0) {
-      x = margin;
-      y += stepY;
-
-      // Start new page if needed
-      if (y + qrSize + labelHeight > 150 - margin) {
-        doc.addPage([110, 150]);
-        x = margin;
-        y = margin;
+        promises.push(
+          QRCode.toDataURL(serialId).then(url => {
+            doc.addImage(url, 'PNG', x, y, size, size);
+            let textX = x + size / 2;
+            doc.text(serialId, textX, y + size + 5, { align: "center" });
+            x += size + space;
+            if (i % perRow === 0) {
+              x = margin;
+              y += size + 15;
+              if (y + size > 140) {
+                doc.addPage();
+                y = margin;
+              }
+            }
+          })
+        );
       }
+
+      Promise.all(promises).then(() => {
+        lastSerialNum += count;
+        localStorage.setItem('lastSerial', lastSerialNum.toString());
+        doc.save('qr-codes.pdf');
+      });
     }
-  }
 
-  lastSerialNum += count;
-  localStorage.setItem('lastSerial', lastSerialNum.toString());
-  doc.save('qr-codes.pdf');
-}
+    function exportHistoryToExcel() {
+      let csv = 'Date,Type,Material Name\n';
+      historyLog.forEach(entry => {
+        let materialName = db[entry.id] || entry.material || 'Unknown';
+        csv += `${entry.date},${entry.type},${materialName}\n`;
+      });
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'material-history.csv';
+      a.click();
+    }
 
+    function exportFilteredHistory() {
+      let selectedDate = document.getElementById('filterDate').value;
+      let selectedType = document.getElementById('filterType').value;
 
-    function exportHistory() {
-      let history = JSON.parse(localStorage.getItem('history') || '[]');
-      if (history.length === 0) {
-        alert("No history found.");
-        return;
+      let filtered = historyLog.filter(entry => {
+        let matchDate = !selectedDate || entry.date.startsWith(selectedDate);
+        let matchType = !selectedType || entry.type === selectedType;
+        return matchDate && matchType;
+      });
+
+      let csv = 'Date,Type,Material Name\n';
+      filtered.forEach(entry => {
+        csv += `${entry.date},${entry.type},${entry.material || db[entry.id] || 'Unknown'}\n`;
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'filtered-material-history.csv';
+      a.click();
+    }
+
+    function resetHistory() {
+      if (confirm("Are you sure you want to clear the history?")) {
+        historyLog = [];
+        saveDB();
+        alert("History reset done.");
       }
-      const ws = XLSX.utils.json_to_sheet(history);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "History");
-      XLSX.writeFile(wb, "material-history.xlsx");
     }
 
     renderList();

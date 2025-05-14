@@ -121,48 +121,68 @@
 
     let lastSerialNum = parseInt(localStorage.getItem('lastSerial') || '0');
 
-    async function generateMultipleQRCodes() {
-      let count = parseInt(prompt("How many QR codes to generate?"));
-      if (isNaN(count) || count <= 0) {
-        alert("Invalid number.");
-        return;
+async function generateMultipleQRCodes() {
+  let count = parseInt(prompt("How many QR codes to generate?"));
+  if (isNaN(count) || count <= 0) {
+    alert("Invalid number.");
+    return;
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: [110, 150]  // Custom page size
+  });
+
+  let margin = 10;
+  let qrSize = 20;
+  let spacingX = 10;
+  let spacingY = 15;
+  let labelHeight = 6;
+  let x = margin;
+  let y = margin;
+
+  const usableWidth = 110 - 2 * margin;
+  const usableHeight = 150 - 2 * margin;
+  const stepX = qrSize + spacingX;
+  const stepY = qrSize + labelHeight + spacingY;
+
+  const perRow = Math.floor(usableWidth / stepX);
+
+  for (let i = 1; i <= count; i++) {
+    let serialNum = lastSerialNum + i;
+    let serialId = `ID${serialNum.toString().padStart(3, '0')}`;
+    let url = await QRCode.toDataURL(serialId);
+
+    doc.addImage(url, 'PNG', x, y, qrSize, qrSize);
+
+    // Centered text
+    let textWidth = doc.getTextWidth(serialId);
+    let centerX = x + qrSize / 2 - textWidth / 2;
+    doc.text(serialId, centerX, y + qrSize + 5);
+
+    // Move to next position
+    x += stepX;
+
+    if ((i % perRow) === 0) {
+      x = margin;
+      y += stepY;
+
+      // Start new page if needed
+      if (y + qrSize + labelHeight > 150 - margin) {
+        doc.addPage([110, 150]);
+        x = margin;
+        y = margin;
       }
-
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF({
-        unit: 'mm',
-        format: [110, 150]
-      });
-
-      let margin = 10, size = 20;
-      let x = margin, y = margin;
-      let perRow = 4;
-
-      for (let i = 1; i <= count; i++) {
-        let serialNum = lastSerialNum + i;
-        let serialId = `ID${serialNum.toString().padStart(3, '0')}`;
-        let url = await QRCode.toDataURL(serialId);
-        doc.addImage(url, 'PNG', x, y, size, size);
-
-        // Centered text
-        let textWidth = doc.getTextWidth(serialId);
-        doc.text(serialId, x + size / 2 - textWidth / 2, y + size + 5);
-
-        x += size + 10;
-        if (i % perRow === 0) {
-          x = margin;
-          y += size + 15;
-          if (y + size > 140) {
-            doc.addPage();
-            y = margin;
-          }
-        }
-      }
-
-      lastSerialNum += count;
-      localStorage.setItem('lastSerial', lastSerialNum.toString());
-      doc.save('qr-codes.pdf');
     }
+  }
+
+  lastSerialNum += count;
+  localStorage.setItem('lastSerial', lastSerialNum.toString());
+  doc.save('qr-codes.pdf');
+}
+
 
     function exportHistory() {
       let history = JSON.parse(localStorage.getItem('history') || '[]');

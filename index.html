@@ -1,23 +1,29 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Material Tracker</title>
+  <title>Guruvel Creativities Inventory</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsPDF/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
-    body { font-family: sans-serif; padding: 20px; max-width: 600px; margin: auto; }
+    body { font-family: sans-serif; padding: 20px; max-width: 700px; margin: auto; text-align: center; }
     .btn { padding: 10px 15px; margin: 5px; font-size: 16px; }
-    .list { margin-top: 20px; }
+    .list { margin-top: 20px; text-align: left; }
     .list div { margin: 5px 0; }
+    img.logo { width: 120px; height: auto; margin-bottom: 10px; }
   </style>
 </head>
 <body>
-  <h2>📦 Material Tracker</h2>
+  <img src="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgra2sfgJ1ZE0ub9g2_geCiFkRrdEhgzI_LQ7qkySYRO9ss4QHHWGTL-HlniFl5AuPq5uu7gtQKvrgyregnbofmhQau5V6kWzcwQcj7G-Wpl2tIXPIfEKOLUbX781JbJbNiQ04dK-Q1TzBS/s268/Screenshot+%25284%2529.png" class="logo" alt="Logo">
+  <h2>📦 Guruvel Creativities Inventory</h2>
+
   <button class="btn" onclick="startScan('add')">➕ Add Stock</button>
   <button class="btn" onclick="startScan('consume')">➖ Consume</button>
   <button class="btn" onclick="generateMultipleQRCodes()">📄 Generate QR Codes</button>
+  <button class="btn" onclick="exportHistory()">📥 Export History</button>
+  
   <div id="reader" style="width: 100%; margin-top: 20px;"></div>
   <button class="btn" id="backButton" style="display: none;" onclick="stopScan()">Go Back</button>
 
@@ -47,7 +53,7 @@
 
     function startScan(mode) {
       const readerElement = document.getElementById("reader");
-      document.getElementById("backButton").style.display = "inline"; // Show back button
+      document.getElementById("backButton").style.display = "inline";
       html5QrCode = new Html5Qrcode("reader");
       Html5Qrcode.getCameras().then(devices => {
         if (devices && devices.length) {
@@ -74,77 +80,105 @@
       }
     }
 
-function handleScan(serial, mode) {
-  serial = serial.trim();
-  if (mode === 'add') {
-    if (db[serial]) {
-      alert('Material already added.');
-      return;
-    }
-    let material = prompt("Enter or select material name:", "NodeMCU");
-    if (material) {
-      db[serial] = material.trim();
-      saveDB();
-      alert('Material added successfully!');  // Confirmation after adding
-    }
-  } else if (mode === 'consume') {
-    if (!db[serial]) {
-      alert('Serial not found.');
-      return;
-    }
-    delete db[serial];
-    saveDB();
-    alert('Material consumed successfully!');  // Confirmation after consuming
-  }
-}
+    function handleScan(serial, mode) {
+      serial = serial.trim();
+      let action = '';
+      let timestamp = new Date().toLocaleString();
 
+      if (mode === 'add') {
+        if (db[serial]) {
+          alert('Already added.');
+          return;
+        }
+        let material = prompt("Enter material name:", "NodeMCU");
+        if (material) {
+          db[serial] = material.trim();
+          saveDB();
+          alert(`✅ Added: ${material}`);
+          action = 'add';
+        }
+      } else if (mode === 'consume') {
+        if (!db[serial]) {
+          alert('Serial not found.');
+          return;
+        }
+        let material = db[serial];
+        delete db[serial];
+        saveDB();
+        alert(`🗑️ Consumed: ${material}`);
+        action = 'consume';
+      }
 
-    renderList();
+      if (action) {
+        let history = JSON.parse(localStorage.getItem('history') || '[]');
+        history.push({ serial, action, timestamp });
+        localStorage.setItem('history', JSON.stringify(history));
+      }
+    }
+
     let lastSerialNum = parseInt(localStorage.getItem('lastSerial') || '0');
 
-function generateMultipleQRCodes() {
-  let count = parseInt(prompt("How many QR codes to generate?"));
-  if (isNaN(count) || count <= 0) {
-    alert("Invalid number.");
-    return;
-  }
+    function generateMultipleQRCodes() {
+      let count = parseInt(prompt("How many QR codes to generate?"));
+      if (isNaN(count) || count <= 0) {
+        alert("Invalid number.");
+        return;
+      }
 
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF();
-  let margin = 10, size = 56;  // Update size to 56 points (20mm)
-  let x = margin, y = margin;
-  let perRow = 3;
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({
+        unit: 'mm',
+        format: [110, 150]
+      });
 
-  let promises = [];
+      let margin = 10, size = 20;
+      let x = margin, y = margin;
+      let perRow = 4;
 
-  for (let i = 1; i <= count; i++) {
-    let serialNum = lastSerialNum + i;
-    let serialId = `ID${serialNum.toString().padStart(3, '0')}`;
+      let promises = [];
 
-    promises.push(
-      QRCode.toDataURL(serialId).then(url => {
-        doc.addImage(url, 'PNG', x, y, size, size);  // Add QR code with updated size
-        doc.text(serialId, x, y + size + 5);
-        x += 60;  // Adjust x-position to fit QR codes
-        if (i % perRow === 0) {
-          x = margin;
-          y += 60 + 10;
-          if (y + 60 > 280) {
-            doc.addPage();
-            y = margin;
-          }
-        }
-      })
-    );
-  }
+      for (let i = 1; i <= count; i++) {
+        let serialNum = lastSerialNum + i;
+        let serialId = `ID${serialNum.toString().padStart(3, '0')}`;
 
-  Promise.all(promises).then(() => {
-    lastSerialNum += count;
-    localStorage.setItem('lastSerial', lastSerialNum.toString());
-    doc.save('qr-codes.pdf');
-  });
-}
+        promises.push(
+          QRCode.toDataURL(serialId).then(url => {
+            doc.addImage(url, 'PNG', x, y, size, size);
+            let textWidth = doc.getTextWidth(serialId);
+            doc.text(serialId, x + (size / 2) - (textWidth / 2), y + size + 5);
+            x += size + 10;
+            if (i % perRow === 0) {
+              x = margin;
+              y += size + 15;
+              if (y + size > 140) {
+                doc.addPage();
+                y = margin;
+              }
+            }
+          })
+        );
+      }
 
+      Promise.all(promises).then(() => {
+        lastSerialNum += count;
+        localStorage.setItem('lastSerial', lastSerialNum.toString());
+        doc.save('qr-codes.pdf');
+      });
+    }
+
+    function exportHistory() {
+      let history = JSON.parse(localStorage.getItem('history') || '[]');
+      if (history.length === 0) {
+        alert("No history found.");
+        return;
+      }
+      const ws = XLSX.utils.json_to_sheet(history);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "History");
+      XLSX.writeFile(wb, "material-history.xlsx");
+    }
+
+    renderList();
   </script>
 </body>
 </html>

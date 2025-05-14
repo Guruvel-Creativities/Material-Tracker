@@ -16,6 +16,7 @@
   <button class="btn" onclick="startScan('add')">➕ Add Stock</button>
   <button class="btn" onclick="startScan('consume')">➖ Consume</button>
   <div id="reader" style="width: 100%; margin-top: 20px;"></div>
+  <button class="btn" id="backButton" style="display: none;" onclick="stopScan()">Go Back</button>
 
   <div class="list">
     <h3>Current Stock</h3>
@@ -24,6 +25,7 @@
 
   <script>
     let db = JSON.parse(localStorage.getItem('materialDB') || '{}');
+    let html5QrCode;
 
     function saveDB() {
       localStorage.setItem('materialDB', JSON.stringify(db));
@@ -41,11 +43,15 @@
     }
 
     function startScan(mode) {
-      const html5QrCode = new Html5Qrcode("reader");
+      const readerElement = document.getElementById("reader");
+      document.getElementById("backButton").style.display = "inline"; // Show back button
+      html5QrCode = new Html5Qrcode("reader");
       Html5Qrcode.getCameras().then(devices => {
         if (devices && devices.length) {
+          // Prefer back camera (typically at index 1)
+          const cameraId = devices.find(device => device.label.toLowerCase().includes("back"))?.id || devices[0].id;
           html5QrCode.start(
-            devices[0].id,
+            cameraId,
             { fps: 10, qrbox: 250 },
             qrCodeMessage => {
               html5QrCode.stop();
@@ -54,6 +60,15 @@
           ).catch(err => alert("Scan error: " + err));
         }
       });
+    }
+
+    function stopScan() {
+      if (html5QrCode) {
+        html5QrCode.stop().then(() => {
+          document.getElementById("backButton").style.display = "none"; // Hide back button
+          document.getElementById("reader").innerHTML = ""; // Clear reader
+        }).catch(err => alert("Error stopping scanner: " + err));
+      }
     }
 
     function handleScan(serial, mode) {

@@ -4,6 +4,8 @@
   <title>Material Tracker</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsPDF/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js"></script>
   <style>
     body { font-family: sans-serif; padding: 20px; max-width: 600px; margin: auto; }
     .btn { padding: 10px 15px; margin: 5px; font-size: 16px; }
@@ -15,6 +17,7 @@
   <h2>📦 Material Tracker</h2>
   <button class="btn" onclick="startScan('add')">➕ Add Stock</button>
   <button class="btn" onclick="startScan('consume')">➖ Consume</button>
+  <button class="btn" onclick="generateMultipleQRCodes()">📄 Generate QR Codes</button>
   <div id="reader" style="width: 100%; margin-top: 20px;"></div>
   <button class="btn" id="backButton" style="display: none;" onclick="stopScan()">Go Back</button>
 
@@ -95,6 +98,51 @@
     }
 
     renderList();
+    let lastSerialNum = parseInt(localStorage.getItem('lastSerial') || '0');
+
+function generateMultipleQRCodes() {
+  let count = parseInt(prompt("How many QR codes to generate?"));
+  if (isNaN(count) || count <= 0) {
+    alert("Invalid number.");
+    return;
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  let margin = 10, size = 40;
+  let x = margin, y = margin;
+  let perRow = 3;
+
+  let promises = [];
+
+  for (let i = 1; i <= count; i++) {
+    let serialNum = lastSerialNum + i;
+    let serialId = `ID${serialNum.toString().padStart(3, '0')}`;
+
+    promises.push(
+      QRCode.toDataURL(serialId).then(url => {
+        doc.addImage(url, 'PNG', x, y, size, size);
+        doc.text(serialId, x, y + size + 5);
+        x += 60;
+        if (i % perRow === 0) {
+          x = margin;
+          y += 60 + 10;
+          if (y + 60 > 280) {
+            doc.addPage();
+            y = margin;
+          }
+        }
+      })
+    );
+  }
+
+  Promise.all(promises).then(() => {
+    lastSerialNum += count;
+    localStorage.setItem('lastSerial', lastSerialNum.toString());
+    doc.save('qr-codes.pdf');
+  });
+}
+
   </script>
 </body>
 </html>

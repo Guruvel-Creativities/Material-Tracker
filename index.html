@@ -3,14 +3,9 @@
 <head>
   <title>Material Tracker</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-
-  <!-- Scanner -->
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-
-  <!-- Fixed jsPDF & QRCode -->
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js"></script>
-
   <style>
     body { font-family: sans-serif; padding: 20px; max-width: 600px; margin: auto; }
     .btn { padding: 10px 15px; margin: 5px; font-size: 16px; }
@@ -19,32 +14,119 @@
   </style>
 </head>
 <body>
-  <button onclick="generateMultipleQRCodes()">📄 Generate QR Codes</button>
+  <h2>📦 Material Tracker</h2>
+  <button class="btn" onclick="startScan('add')">➕ Add Stock</button>
+  <button class="btn" onclick="startScan('consume')">➖ Consume</button>
+  <button class="btn" onclick="generateMultipleQRCodes()">📄 Generate QR Codes</button>
+  <div id="reader" style="width: 100%; margin-top: 20px;"></div>
+  <button class="btn" id="backButton" style="display: none;" onclick="stopScan()">Go Back</button>
+
+  <div class="list">
+    <h3>Current Stock</h3>
+    <div id="stockList"></div>
+  </div>
 
   <script>
+    let db = JSON.parse(localStorage.getItem('materialDB') || '{}');
+    let html5QrCode;
+
+    function saveDB() {
+      localStorage.setItem('materialDB', JSON.stringify(db));
+      renderList();
+    }
+
+    function renderList() {
+      let stock = {};
+      for (let serial in db) {
+        let material = db[serial];
+        stock[material] = (stock[material] || 0) + 1;
+      }
+      let html = Object.entries(stock).map(([mat, count]) => `<div>${mat}: ${count}</div>`).join('');
+      document.getElementById('stockList').innerHTML = html || '<i>No materials in stock.</i>';
+    }
+
+    function startScan(mode) {
+      const readerElement = document.getElementById("reader");
+      document.getElementById("backButton").style.display = "inline"; // Show back button
+      html5QrCode = new Html5Qrcode("reader");
+      Html5Qrcode.getCameras().then(devices => {
+        if (devices && devices.length) {
+          let backCamera = devices.find(device => device.label.toLowerCase().includes("back"));
+          const cameraId = backCamera ? backCamera.id : devices[0].id;
+          html5QrCode.start(
+            cameraId,
+            { fps: 10, qrbox: 250 },
+            qrCodeMessage => {
+              html5QrCode.stop();
+              handleScan(qrCodeMessage, mode);
+            }
+          ).catch(err => alert("Scan error: " + err));
+        }
+      });
+    }
+
+    function stopScan() {
+      if (html5QrCode) {
+        html5QrCode.stop().then(() => {
+          document.getElementById("backButton").style.display = "none";
+          document.getElementById("reader").innerHTML = "";
+        }).catch(err => alert("Error stopping scanner: " + err));
+      }
+    }
+
+    function handleScan(serial, mode) {
+      serial = serial.trim();
+      if (mode === 'add') {
+        if (db[serial]) {
+          alert('Already added.');
+          return;
+        }
+        let material = prompt("Enter or select material name:", "NodeMCU");
+        if (material) {
+          db[serial] = material.trim();
+          saveDB();
+        }
+      } else if (mode === 'consume') {
+        if (!db[serial]) {
+          alert('Serial not found.');
+          return;
+        }
+        delete db[serial];
+        saveDB();
+      }
+    }
+
+    renderList();
     let lastSerialNum = parseInt(localStorage.getItem('lastSerial') || '0');
 
     function generateMultipleQRCodes() {
       let count = parseInt(prompt("How many QR codes to generate?"));
-      if (isNaN(count) || count <= 0) return;
+      if (isNaN(count) || count <= 0) {
+        alert("Invalid number.");
+        return;
+      }
 
       const jsPDF = window.jspdf.jsPDF;
-      const doc = new jsPDF();
-      let margin = 10, size = 40, x = margin, y = margin;
-      let perRow = 3, promises = [];
+      const doc = new jsPDF({ unit: 'mm', format: [110, 150] });
+      let margin = 10, size = 40;
+      let x = margin, y = margin;
+      let perRow = 2; // 2 per row based on width
+
+      let promises = [];
 
       for (let i = 1; i <= count; i++) {
         let serialNum = lastSerialNum + i;
         let serialId = `ID${serialNum.toString().padStart(3, '0')}`;
+
         promises.push(
           QRCode.toDataURL(serialId).then(url => {
             doc.addImage(url, 'PNG', x, y, size, size);
             doc.text(serialId, x, y + size + 5);
-            x += 60;
-            if (i % perRow === 0) {
+            x += 55;
+            if (x + size > 110) {
               x = margin;
-              y += 60 + 10;
-              if (y + 60 > 280) {
+              y += size + 15;
+              if (y + size > 150) {
                 doc.addPage();
                 y = margin;
               }
@@ -56,7 +138,6 @@
       Promise.all(promises).then(() => {
         lastSerialNum += count;
         localStorage.setItem('lastSerial', lastSerialNum.toString());
-        console.log("PDF ready, downloading...");
         doc.save('qr-codes.pdf');
       });
     }

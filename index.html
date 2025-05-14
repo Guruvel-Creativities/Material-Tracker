@@ -3,8 +3,9 @@
 <head>
   <title>Guruvel Creativities Inventory</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Working CDNs -->
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsPDF/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
@@ -16,14 +17,16 @@
   </style>
 </head>
 <body>
+  <!-- Logo and Title -->
   <img src="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgra2sfgJ1ZE0ub9g2_geCiFkRrdEhgzI_LQ7qkySYRO9ss4QHHWGTL-HlniFl5AuPq5uu7gtQKvrgyregnbofmhQau5V6kWzcwQcj7G-Wpl2tIXPIfEKOLUbX781JbJbNiQ04dK-Q1TzBS/s268/Screenshot+%25284%2529.png" class="logo" alt="Logo">
   <h2>📦 Guruvel Creativities Inventory</h2>
 
+  <!-- Action Buttons -->
   <button class="btn" onclick="startScan('add')">➕ Add Stock</button>
   <button class="btn" onclick="startScan('consume')">➖ Consume</button>
   <button class="btn" onclick="generateMultipleQRCodes()">📄 Generate QR Codes</button>
   <button class="btn" onclick="exportHistory()">📥 Export History</button>
-  
+
   <div id="reader" style="width: 100%; margin-top: 20px;"></div>
   <button class="btn" id="backButton" style="display: none;" onclick="stopScan()">Go Back</button>
 
@@ -118,7 +121,7 @@
 
     let lastSerialNum = parseInt(localStorage.getItem('lastSerial') || '0');
 
-    function generateMultipleQRCodes() {
+    async function generateMultipleQRCodes() {
       let count = parseInt(prompt("How many QR codes to generate?"));
       if (isNaN(count) || count <= 0) {
         alert("Invalid number.");
@@ -135,35 +138,30 @@
       let x = margin, y = margin;
       let perRow = 4;
 
-      let promises = [];
-
       for (let i = 1; i <= count; i++) {
         let serialNum = lastSerialNum + i;
         let serialId = `ID${serialNum.toString().padStart(3, '0')}`;
+        let url = await QRCode.toDataURL(serialId);
+        doc.addImage(url, 'PNG', x, y, size, size);
 
-        promises.push(
-          QRCode.toDataURL(serialId).then(url => {
-            doc.addImage(url, 'PNG', x, y, size, size);
-            let textWidth = doc.getTextWidth(serialId);
-            doc.text(serialId, x + (size / 2) - (textWidth / 2), y + size + 5);
-            x += size + 10;
-            if (i % perRow === 0) {
-              x = margin;
-              y += size + 15;
-              if (y + size > 140) {
-                doc.addPage();
-                y = margin;
-              }
-            }
-          })
-        );
+        // Centered text
+        let textWidth = doc.getTextWidth(serialId);
+        doc.text(serialId, x + size / 2 - textWidth / 2, y + size + 5);
+
+        x += size + 10;
+        if (i % perRow === 0) {
+          x = margin;
+          y += size + 15;
+          if (y + size > 140) {
+            doc.addPage();
+            y = margin;
+          }
+        }
       }
 
-      Promise.all(promises).then(() => {
-        lastSerialNum += count;
-        localStorage.setItem('lastSerial', lastSerialNum.toString());
-        doc.save('qr-codes.pdf');
-      });
+      lastSerialNum += count;
+      localStorage.setItem('lastSerial', lastSerialNum.toString());
+      doc.save('qr-codes.pdf');
     }
 
     function exportHistory() {

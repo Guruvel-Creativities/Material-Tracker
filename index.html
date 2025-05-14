@@ -74,73 +74,77 @@
       }
     }
 
-    function handleScan(serial, mode) {
-      serial = serial.trim();
-      if (mode === 'add') {
-        if (db[serial]) {
-          alert('Already added.');
-          return;
-        }
-        let material = prompt("Enter or select material name:", "NodeMCU");
-        if (material) {
-          db[serial] = material.trim();
-          saveDB();
-        }
-      } else if (mode === 'consume') {
-        if (!db[serial]) {
-          alert('Serial not found.');
-          return;
-        }
-        delete db[serial];
-        saveDB();
-      }
+function handleScan(serial, mode) {
+  serial = serial.trim();
+  if (mode === 'add') {
+    if (db[serial]) {
+      alert('Material already added.');
+      return;
     }
+    let material = prompt("Enter or select material name:", "NodeMCU");
+    if (material) {
+      db[serial] = material.trim();
+      saveDB();
+      alert('Material added successfully!');  // Confirmation after adding
+    }
+  } else if (mode === 'consume') {
+    if (!db[serial]) {
+      alert('Serial not found.');
+      return;
+    }
+    delete db[serial];
+    saveDB();
+    alert('Material consumed successfully!');  // Confirmation after consuming
+  }
+}
+
 
     renderList();
     let lastSerialNum = parseInt(localStorage.getItem('lastSerial') || '0');
 
-    function generateMultipleQRCodes() {
-      let count = parseInt(prompt("How many QR codes to generate?"));
-      if (isNaN(count) || count <= 0) {
-        alert("Invalid number.");
-        return;
-      }
+function generateMultipleQRCodes() {
+  let count = parseInt(prompt("How many QR codes to generate?"));
+  if (isNaN(count) || count <= 0) {
+    alert("Invalid number.");
+    return;
+  }
 
-      const jsPDF = window.jspdf.jsPDF;
-      const doc = new jsPDF({ unit: 'mm', format: [110, 150] });
-      let margin = 10, size = 40;
-      let x = margin, y = margin;
-      let perRow = 2; // 2 per row based on width
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  let margin = 10, size = 56;  // Update size to 56 points (20mm)
+  let x = margin, y = margin;
+  let perRow = 3;
 
-      let promises = [];
+  let promises = [];
 
-      for (let i = 1; i <= count; i++) {
-        let serialNum = lastSerialNum + i;
-        let serialId = `ID${serialNum.toString().padStart(3, '0')}`;
+  for (let i = 1; i <= count; i++) {
+    let serialNum = lastSerialNum + i;
+    let serialId = `ID${serialNum.toString().padStart(3, '0')}`;
 
-        promises.push(
-          QRCode.toDataURL(serialId).then(url => {
-            doc.addImage(url, 'PNG', x, y, size, size);
-            doc.text(serialId, x, y + size + 5);
-            x += 55;
-            if (x + size > 110) {
-              x = margin;
-              y += size + 15;
-              if (y + size > 150) {
-                doc.addPage();
-                y = margin;
-              }
-            }
-          })
-        );
-      }
+    promises.push(
+      QRCode.toDataURL(serialId).then(url => {
+        doc.addImage(url, 'PNG', x, y, size, size);  // Add QR code with updated size
+        doc.text(serialId, x, y + size + 5);
+        x += 60;  // Adjust x-position to fit QR codes
+        if (i % perRow === 0) {
+          x = margin;
+          y += 60 + 10;
+          if (y + 60 > 280) {
+            doc.addPage();
+            y = margin;
+          }
+        }
+      })
+    );
+  }
 
-      Promise.all(promises).then(() => {
-        lastSerialNum += count;
-        localStorage.setItem('lastSerial', lastSerialNum.toString());
-        doc.save('qr-codes.pdf');
-      });
-    }
+  Promise.all(promises).then(() => {
+    lastSerialNum += count;
+    localStorage.setItem('lastSerial', lastSerialNum.toString());
+    doc.save('qr-codes.pdf');
+  });
+}
+
   </script>
 </body>
 </html>

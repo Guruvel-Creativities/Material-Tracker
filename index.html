@@ -48,8 +48,9 @@
       html5QrCode = new Html5Qrcode("reader");
       Html5Qrcode.getCameras().then(devices => {
         if (devices && devices.length) {
-          // Prefer back camera (typically at index 1)
-          const cameraId = devices.find(device => device.label.toLowerCase().includes("back"))?.id || devices[0].id;
+          // Find back camera by checking the label
+          let backCamera = devices.find(device => device.label.toLowerCase().includes("back"));
+          const cameraId = backCamera ? backCamera.id : devices[0].id; // Use back camera if found, else fallback to the first device
           html5QrCode.start(
             cameraId,
             { fps: 10, qrbox: 250 },

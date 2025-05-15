@@ -6,6 +6,27 @@
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js"></script>
+  <script src="https://www.gstatic.comfirebasejs/10.12.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.comfirebasejs/10.12.0/firebase-firestore.js"></script>
+  <script type="module">
+  // Import the functions you need from the SDKs you need
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.7.3/firebase-app.js";
+  // TODO: Add SDKs for Firebase products that you want to use
+  // https://firebase.google.com/docs/web/setup#available-libraries
+
+  // Your web app's Firebase configuration
+  const firebaseConfig = {
+    apiKey: "AIzaSyBmXJZ6dm-SLzzIvz9P22kXI23MwdW3WC0",
+    authDomain: "material-tracker-49dac.firebaseapp.com",
+    projectId: "material-tracker-49dac",
+    storageBucket: "material-tracker-49dac.firebasestorage.app",
+    messagingSenderId: "548291877330",
+    appId: "1:548291877330:web:0c69532e582fe22880100b"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+</script>
   <style>
     body { font-family: sans-serif; padding: 20px; max-width: 800px; margin: auto; }
     .btn { padding: 10px 15px; margin: 5px; font-size: 16px; }

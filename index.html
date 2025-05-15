@@ -1,8 +1,13 @@
 <!DOCTYPE html>
-<html>
+<html lang="en" >
 <head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Guruvel Creativities Inventory</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js"></script>
@@ -11,38 +16,41 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <!-- Firebase Firestore (compat) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-
-  <style>
-    body { font-family: sans-serif; padding: 20px; max-width: 800px; margin: auto; }
-    .btn { padding: 10px 15px; margin: 5px; font-size: 16px; }
-    .list { margin-top: 20px; }
-    .list div { margin: 5px 0; }
-    img.logo { width: 100px; }
-  </style>
 </head>
-<body>
-  <img class="logo" src="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgra2sfgJ1ZE0ub9g2_geCiFkRrdEhgzI_LQ7qkySYRO9ss4QHHWGTL-HlniFl5AuPq5uu7gtQKvrgyregnbofmhQau5V6kWzcwQcj7G-Wpl2tIXPIfEKOLUbX781JbJbNiQ04dK-Q1TzBS/s268/Screenshot+%25284%2529.png"/>
-  <h2>📦 Guruvel Creativities Inventory</h2>
-  <button class="btn" onclick="startScan('add')">➕ Add Stock</button>
-  <button class="btn" onclick="startScan('consume')">➖ Consume</button>
-  <button class="btn" onclick="generateMultipleQRCodes()">📄 Generate QR Codes</button>
-  <button class="btn" onclick="exportHistoryToExcel()">📤 Export History</button>
-  <button class="btn" onclick="resetHistory()">🗑️ Reset History</button>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center p-6 font-sans">
+  <div class="max-w-3xl w-full bg-white rounded-lg shadow-lg p-6">
+    <div class="flex items-center mb-6 space-x-4">
+      <img class="w-24" src="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgra2sfgJ1ZE0ub9g2_geCiFkRrdEhgzI_LQ7qkySYRO9ss4QHHWGTL-HlniFl5AuPq5uu7gtQKvrgyregnbofmhQau5V6kWzcwQcj7G-Wpl2tIXPIfEKOLUbX781JbJbNiQ04dK-Q1TzBS/s268/Screenshot+%25284%2529.png" alt="Logo" />
+      <h1 class="text-3xl font-bold text-gray-800">Guruvel Creativities Inventory</h1>
+    </div>
 
-  <input type="date" id="filterDate">
-  <select id="filterType">
-    <option value="">All</option>
-    <option value="Add">Add</option>
-    <option value="Consume">Consume</option>
-  </select>
-  <button class="btn" onclick="exportFilteredHistory()">📁 Export Filtered</button>
+    <div class="flex flex-wrap gap-3 mb-6">
+      <button class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded shadow transition" onclick="startScan('add')">➕ Add Stock</button>
+      <button class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded shadow transition" onclick="startScan('consume')">➖ Consume</button>
+      <button class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded shadow transition" onclick="generateMultipleQRCodes()">📄 Generate QR Codes</button>
+      <button class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded shadow transition" onclick="exportHistoryToExcel()">📤 Export History</button>
+      <button class="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded shadow transition" onclick="resetHistory()">🗑️ Reset History</button>
+    </div>
 
-  <div id="reader" style="width: 100%; margin-top: 20px;"></div>
-  <button class="btn" id="backButton" style="display: none;" onclick="stopScan()">Go Back</button>
+    <div class="flex flex-wrap gap-3 items-center mb-6">
+      <input type="date" id="filterDate" class="border border-gray-300 rounded px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+      <select id="filterType" class="border border-gray-300 rounded px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        <option value="">All Types</option>
+        <option value="Add">Add</option>
+        <option value="Consume">Consume</option>
+      </select>
+      <button class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded shadow transition" onclick="exportFilteredHistory()">📁 Export Filtered</button>
+    </div>
 
-  <div class="list">
-    <h3>Current Stock</h3>
-    <div id="stockList"></div>
+    <div id="reader" class="w-full rounded border border-gray-300 bg-gray-50 p-3 mb-4"></div>
+    <button id="backButton" class="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-4 rounded shadow transition mb-6 hidden" onclick="stopScan()">⬅️ Go Back</button>
+
+    <div class="bg-gray-50 rounded p-4 shadow-inner">
+      <h2 class="text-xl font-semibold text-gray-700 mb-3 border-b border-gray-300 pb-2">Current Stock</h2>
+      <div id="stockList" class="text-gray-800 text-lg min-h-[100px]">
+        <i>No materials in stock.</i>
+      </div>
+    </div>
   </div>
 
 <script>
@@ -168,7 +176,7 @@
     const doc = new jsPDF({ unit: "mm", format: [110, 150] });
     let margin = 10, size = 20, space = 10;
     let x = margin, y = margin;
-    let perRow = 4;
+    let perRow = 3;
 
     let promises = [];
 

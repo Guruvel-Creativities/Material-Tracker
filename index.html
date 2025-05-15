@@ -3,60 +3,42 @@
 <head>
   <title>Guruvel Creativities Inventory</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  <!-- QR Code scanning and generation -->
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js"></script>
-<!-- ✅ Firebase App (compat) -->
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 
-<!-- ✅ Firebase Firestore (compat) -->
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <!-- Firebase App (compat) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <!-- Firebase Firestore (compat) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
-
-
-  <script type="module">
-  // Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
-const firebaseConfig = {
-  apiKey: "AIzaSyBmXJZ6dm-SLzzIvz9P22kXI23MwdW3WC0",
-  authDomain: "material-tracker-49dac.firebaseapp.com",
-  projectId: "material-tracker-49dac",
-  storageBucket: "material-tracker-49dac.firebasestorage.app",
-  messagingSenderId: "548291877330",
-  appId: "1:548291877330:web:94a5d62b40058ad480100b"
-};
-      firebase.initializeApp(firebaseConfig);
-  const db = firebase.firestore();
-
-  // Optional: test Firestore connection
-  db.collection("test").add({ timestamp: Date.now() })
-    .then(() => console.log("✅ Firestore Connected"))
-    .catch(error => console.error("❌ Firestore Error:", error));
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-</script>
   <style>
     body { font-family: sans-serif; padding: 20px; max-width: 800px; margin: auto; }
-    .btn { padding: 10px 15px; margin: 5px; font-size: 16px; }
+    .btn { padding: 10px 15px; margin: 5px; font-size: 16px; cursor: pointer; }
     .list { margin-top: 20px; }
     .list div { margin: 5px 0; }
-    img.logo { width: 100px; }
+    img.logo { width: 100px; display: block; margin-bottom: 10px; }
+    h2 { margin-bottom: 20px; }
+    #reader { margin-top: 20px; }
+    #backButton { margin-top: 10px; }
+    select, input[type=date] { margin: 5px; padding: 5px; font-size: 14px; }
   </style>
 </head>
 <body>
-  <img class="logo" src="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgra2sfgJ1ZE0ub9g2_geCiFkRrdEhgzI_LQ7qkySYRO9ss4QHHWGTL-HlniFl5AuPq5uu7gtQKvrgyregnbofmhQau5V6kWzcwQcj7G-Wpl2tIXPIfEKOLUbX781JbJbNiQ04dK-Q1TzBS/s268/Screenshot+%25284%2529.png"/>
+  <img class="logo" src="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgra2sfgJ1ZE0ub9g2_geCiFkRrdEhgzI_LQ7qkySYRO9ss4QHHWGTL-HlniFl5AuPq5uu7gtQKvrgyregnbofmhQau5V6kWzcwQcj7G-Wpl2tIXPIfEKOLUbX781JbJbNiQ04dK-Q1TzBS/s268/Screenshot+%25284%2529.png" alt="Guruvel Logo" />
   <h2>📦 Guruvel Creativities Inventory</h2>
+
   <button class="btn" onclick="startScan('add')">➕ Add Stock</button>
   <button class="btn" onclick="startScan('consume')">➖ Consume</button>
   <button class="btn" onclick="generateMultipleQRCodes()">📄 Generate QR Codes</button>
   <button class="btn" onclick="exportHistoryToExcel()">📤 Export History</button>
   <button class="btn" onclick="resetHistory()">🗑️ Reset History</button>
-  <input type="date" id="filterDate">
+
+  <br>
+
+  <input type="date" id="filterDate" />
   <select id="filterType">
     <option value="">All</option>
     <option value="Add">Add</option>
@@ -64,7 +46,7 @@ const app = initializeApp(firebaseConfig);
   </select>
   <button class="btn" onclick="exportFilteredHistory()">📁 Export Filtered</button>
 
-  <div id="reader" style="width: 100%; margin-top: 20px;"></div>
+  <div id="reader"></div>
   <button class="btn" id="backButton" style="display: none;" onclick="stopScan()">Go Back</button>
 
   <div class="list">
@@ -73,6 +55,20 @@ const app = initializeApp(firebaseConfig);
   </div>
 
   <script>
+    // Firebase config and initialization - compat style
+    const firebaseConfig = {
+      apiKey: "AIzaSyBmXJZ6dm-SLzzIvz9P22kXI23MwdW3WC0",
+      authDomain: "material-tracker-49dac.firebaseapp.com",
+      projectId: "material-tracker-49dac",
+      storageBucket: "material-tracker-49dac.appspot.com",
+      messagingSenderId: "548291877330",
+      appId: "1:548291877330:web:94a5d62b40058ad480100b"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const dbFirebase = firebase.firestore();
+
+    // Local storage based DB (for fallback or demo)
     let db = JSON.parse(localStorage.getItem('materialDB') || '{}');
     let historyLog = JSON.parse(localStorage.getItem('materialHistory') || '[]');
     let html5QrCode;
@@ -208,27 +204,38 @@ const app = initializeApp(firebaseConfig);
         return matchDate && matchType;
       });
 
+      if (!filtered.length) {
+        alert("No records match the filter.");
+        return;
+      }
+
       let csv = 'Date,Type,Material Name\n';
       filtered.forEach(entry => {
-        csv += `${entry.date},${entry.type},${entry.material || db[entry.id] || 'Unknown'}\n`;
+        let materialName = db[entry.id] || entry.material || 'Unknown';
+        csv += `${entry.date},${entry.type},${materialName}\n`;
       });
 
       const blob = new Blob([csv], { type: 'text/csv' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = 'filtered-material-history.csv';
+      a.download = 'filtered-history.csv';
       a.click();
     }
 
     function resetHistory() {
-      if (confirm("Are you sure you want to clear the history?")) {
+      if (confirm('Are you sure you want to reset all data?')) {
+        localStorage.clear();
+        db = {};
         historyLog = [];
-        saveDB();
-        alert("History reset done.");
+        lastSerialNum = 0;
+        renderList();
+        alert('Data cleared.');
       }
     }
 
+    // On page load:
     renderList();
+
   </script>
 </body>
 </html>

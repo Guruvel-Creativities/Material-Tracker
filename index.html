@@ -85,7 +85,6 @@
         if (devices.length) {
           html5QrCode.start(
             { facingMode: "environment" },
-            devices[0].id,
             { fps: 10, qrbox: 250 },
             message => {
               html5QrCode.stop();

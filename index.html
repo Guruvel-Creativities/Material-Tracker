@@ -122,8 +122,7 @@
         }
       }
     }
-
-    async function generateMultipleQRCodes() {
+async function generateMultipleQRCodes() {
   const count = parseInt(prompt("How many QR codes?"));
   if (!count || count <= 0) return;
 
@@ -157,9 +156,14 @@
   let margin = 10, size = 20, space = 10, x = margin, y = margin, perRow = 3;
   let promises = [];
 
+  // Array to hold all new IDs for saving in Firebase
+  let newIDs = [];
+
   for (let i = 1; i <= count; i++) {
     let newID = maxID + i;
     let serial = `ID${newID}`;
+    newIDs.push(serial);
+
     promises.push(
       QRCode.toDataURL(serial).then(url => {
         doc.addImage(url, "PNG", x, y, size, size);
@@ -177,10 +181,20 @@
     );
   }
 
-  Promise.all(promises).then(() => doc.save("qr-codes.pdf"));
+  await Promise.all(promises);
+
+  // Save all new QR IDs in Firebase materials with placeholder material name
+  const batch = db.batch();
+  newIDs.forEach(id => {
+    const docRef = db.collection("materials").doc(id);
+    batch.set(docRef, { material: "UNNAMED" });  // You can change "UNNAMED" as you wish
+  });
+  await batch.commit();
+
+  doc.save("qr-codes.pdf");
+
+  alert(`Generated ${count} QR codes from ID${maxID + 1} to ID${maxID + count}. \n\nAll saved in Firebase with material = "UNNAMED". Please update them later.`);
 }
-
-
 
     function exportHistoryToExcel() {
       let csv = "Date,Type,Material\n";

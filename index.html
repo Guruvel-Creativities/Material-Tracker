@@ -1,318 +1,181 @@
 <!DOCTYPE html>
-<html lang="en" >
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Guruvel Creativities Inventory</title>
-  
-  <!-- Tailwind CSS CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js"></script>
-
-  <!-- Firebase App (compat) -->
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-  <!-- Firebase Firestore (compat) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-100 min-h-screen flex flex-col items-center p-6 font-sans">
-  <div class="max-w-3xl w-full bg-white rounded-lg shadow-lg p-6">
-    <div class="flex items-center mb-6 space-x-4">
-      <img class="w-24" src="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgra2sfgJ1ZE0ub9g2_geCiFkRrdEhgzI_LQ7qkySYRO9ss4QHHWGTL-HlniFl5AuPq5uu7gtQKvrgyregnbofmhQau5V6kWzcwQcj7G-Wpl2tIXPIfEKOLUbX781JbJbNiQ04dK-Q1TzBS/s268/Screenshot+%25284%2529.png" alt="Logo" />
-      <h1 class="text-3xl font-bold text-gray-800">Guruvel Creativities Inventory</h1>
-    </div>
-
-    <div class="flex flex-wrap gap-3 mb-6">
-      <button class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded shadow transition" onclick="startScan('add')">➕ Add Stock</button>
-      <button class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded shadow transition" onclick="startScan('consume')">➖ Consume</button>
-      <button class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded shadow transition" onclick="generateMultipleQRCodes()">📄 Generate QR Codes</button>
-      <button class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded shadow transition" onclick="exportHistoryToExcel()">📤 Export History</button>
-      <button class="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded shadow transition" onclick="resetHistory()">🗑️ Reset History</button>
-    </div>
-
-    <div class="flex flex-wrap gap-3 items-center mb-6">
-      <input type="date" id="filterDate" class="border border-gray-300 rounded px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-      <select id="filterType" class="border border-gray-300 rounded px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-        <option value="">All Types</option>
-        <option value="Add">Add</option>
-        <option value="Consume">Consume</option>
-      </select>
-      <button class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded shadow transition" onclick="exportFilteredHistory()">📁 Export Filtered</button>
-    </div>
-
-    <div id="reader" class="w-full rounded border border-gray-300 bg-gray-50 p-3 mb-4"></div>
-    <button id="backButton" class="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-4 rounded shadow transition mb-6 hidden" onclick="stopScan()">⬅️ Go Back</button>
-
-    <div class="bg-gray-50 rounded p-4 shadow-inner">
-      <h2 class="text-xl font-semibold text-gray-700 mb-3 border-b border-gray-300 pb-2">Current Stock</h2>
-      <div id="stockList" class="text-gray-800 text-lg min-h-[100px]">
-        <i>No materials in stock.</i>
-      </div>
-    </div>
+<body class="bg-gray-100 text-gray-800 p-6 max-w-4xl mx-auto">
+  <div class="flex items-center mb-4">
+    <img src="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgra2sfgJ1ZE0ub9g2_geCiFkRrdEhgzI_LQ7qkySYRO9ss4QHHWGTL-HlniFl5AuPq5uu7gtQKvrgyregnbofmhQau5V6kWzcwQcj7G-Wpl2tIXPIfEKOLUbX781JbJbNiQ04dK-Q1TzBS/s268/Screenshot+%25284%2529.png" class="w-16 h-16 mr-4" />
+    <h1 class="text-2xl font-bold">Guruvel Creativities Inventory</h1>
   </div>
 
-<script>
-  // Your Firebase config here
-  const firebaseConfig = {
-    apiKey: "AIzaSyBmXJZ6dm-SLzzIvz9P22kXI23MwdW3WC0",
-    authDomain: "material-tracker-49dac.firebaseapp.com",
-    projectId: "material-tracker-49dac",
-    storageBucket: "material-tracker-49dac.appspot.com",
-    messagingSenderId: "548291877330",
-    appId: "1:548291877330:web:94a5d62b40058ad480100b"
-  };
+  <div class="flex flex-wrap gap-2 mb-4">
+    <button onclick="startScan('add')" class="bg-blue-600 text-white px-4 py-2 rounded">➕ Add Stock</button>
+    <button onclick="startScan('consume')" class="bg-red-600 text-white px-4 py-2 rounded">➖ Consume</button>
+    <button onclick="generateMultipleQRCodes()" class="bg-yellow-600 text-white px-4 py-2 rounded">📄 Generate QR Codes</button>
+    <button onclick="exportHistoryToExcel()" class="bg-green-700 text-white px-4 py-2 rounded">📤 Export History</button>
+    <button onclick="resetHistory()" class="bg-gray-700 text-white px-4 py-2 rounded">🗑 Reset</button>
+  </div>
 
-  // Initialize Firebase
-  firebase.initializeApp(firebaseConfig);
-  const dbFirebase = firebase.firestore();
+  <div class="flex items-center gap-2 mb-4">
+    <input type="date" id="filterDate" class="p-2 border rounded" />
+    <select id="filterType" class="p-2 border rounded">
+      <option value="">All</option>
+      <option value="Add">Add</option>
+      <option value="Consume">Consume</option>
+    </select>
+    <button onclick="exportFilteredHistory()" class="bg-indigo-600 text-white px-4 py-2 rounded">📁 Export Filtered</button>
+  </div>
 
-  let db = {};            // {serial: material}
-  let historyLog = [];    // array of history entries
-  let html5QrCode;
-  let lastSerialNum = parseInt(localStorage.getItem('lastSerial') || '0');
+  <div id="reader" class="mb-4"></div>
+  <button id="backButton" onclick="stopScan()" class="hidden bg-gray-400 text-white px-4 py-2 rounded mb-4">⬅ Go Back</button>
 
-  // Save to localStorage for cache
-  function saveDB() {
-    localStorage.setItem('materialDB', JSON.stringify(db));
-    localStorage.setItem('materialHistory', JSON.stringify(historyLog));
-    renderList();
-  }
+  <h2 class="text-xl font-semibold mb-2">📦 Current Stock</h2>
+  <div id="stockList" class="grid grid-cols-2 gap-2 bg-white p-4 rounded shadow"></div>
 
-  // Render current stock grouped by material
-  function renderList() {
-    let stock = {};
-    for (let serial in db) {
-      let material = db[serial];
-      stock[material] = (stock[material] || 0) + 1;
-    }
-    let html = Object.entries(stock).map(([mat, count]) => `<div>${mat}: ${count}</div>`).join('');
-    document.getElementById('stockList').innerHTML = html || '<i>No materials in stock.</i>';
-  }
+  <script>
+    // Firebase Config
+    const firebaseConfig = {
+      apiKey: "AIzaSyBmXJZ6dm-SLzzIvz9P22kXI23MwdW3WC0",
+      authDomain: "material-tracker-49dac.firebaseapp.com",
+      projectId: "material-tracker-49dac",
+      storageBucket: "material-tracker-49dac.appspot.com",
+      messagingSenderId: "548291877330",
+      appId: "1:548291877330:web:94a5d62b40058ad480100b"
+    };
 
-  // Start scanning QR
-  function startScan(mode) {
-    const readerElement = document.getElementById("reader");
-    document.getElementById("backButton").style.display = "inline";
-    html5QrCode = new Html5Qrcode("reader");
-    Html5Qrcode.getCameras().then(devices => {
-      if (devices.length) {
-        const backCamera = devices.find(d => d.label.toLowerCase().includes("back")) || devices[0];
-        html5QrCode.start(
-          backCamera.id,
-          { fps: 10, qrbox: 250 },
-          qrCodeMessage => {
-            html5QrCode.stop();
-            handleScan(qrCodeMessage, mode);
-          }
-        ).catch(err => alert("Scan error: " + err));
-      }
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    let materialDB = {}, historyLog = [];
+    let html5QrCode;
+
+    db.collection("materials").onSnapshot(snapshot => {
+      materialDB = {};
+      snapshot.forEach(doc => materialDB[doc.id] = doc.data().material);
+      renderList();
     });
-  }
 
-  function stopScan() {
-    if (html5QrCode) {
-      html5QrCode.stop().then(() => {
-        document.getElementById("backButton").style.display = "none";
-        document.getElementById("reader").innerHTML = "";
-      });
+    db.collection("history").onSnapshot(snapshot => {
+      historyLog = snapshot.docs.map(doc => doc.data());
+    });
+
+    function renderList() {
+      const countMap = {};
+      Object.values(materialDB).forEach(name => countMap[name] = (countMap[name] || 0) + 1);
+      const html = Object.entries(countMap)
+        .map(([name, count]) => `<div class="border p-2 rounded bg-gray-100">${name}: <strong>${count}</strong></div>`)
+        .join('');
+      document.getElementById("stockList").innerHTML = html || "<i>No stock available.</i>";
     }
-  }
 
-  // Handle scanned QR codes: Add or Consume materials + update Firestore
-  async function handleScan(serial, mode) {
-    serial = serial.trim();
-    const now = new Date().toISOString();  // ISO format for better sorting in Firestore
-
-    if (mode === 'add') {
-      if (db[serial]) return alert('Already added.');
-      let material = prompt("Enter or select material name:", "NodeMCU");
-      if (material) {
-        material = material.trim();
-        db[serial] = material;
-        const historyEntry = { date: now, type: 'Add', id: serial, material };
-        historyLog.push(historyEntry);
-        saveDB();
-
-        // Firestore writes
-        try {
-          await dbFirebase.collection('materials').doc(serial).set({
-            material,
-            addedAt: firebase.firestore.FieldValue.serverTimestamp()
-          });
-          await dbFirebase.collection('history').add(historyEntry);
-        } catch (e) {
-          alert("Firestore save error: " + e.message);
-        }
-
-        alert('Material added successfully.');
-      }
-    } else if (mode === 'consume') {
-      if (!db[serial]) return alert('Serial not found.');
-      const historyEntry = { date: now, type: 'Consume', id: serial, material: db[serial] };
-      historyLog.push(historyEntry);
-      delete db[serial];
-      saveDB();
-
-      // Firestore writes
-      try {
-        await dbFirebase.collection('materials').doc(serial).delete();
-        await dbFirebase.collection('history').add(historyEntry);
-      } catch (e) {
-        alert("Firestore save error: " + e.message);
-      }
-
-      alert('Material consumed successfully.');
-    }
-  }
-
-  // Generate QR codes PDF (unchanged)
-  function generateMultipleQRCodes() {
-    let count = parseInt(prompt("How many QR codes to generate?"));
-    if (isNaN(count) || count <= 0) return alert("Invalid number.");
-
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ unit: "mm", format: [110, 150] });
-    let margin = 10, size = 20, space = 10;
-    let x = margin, y = margin;
-    let perRow = 3;
-
-    let promises = [];
-
-    for (let i = 1; i <= count; i++) {
-      let serialNum = lastSerialNum + i;
-      let serialId = `ID${serialNum.toString().padStart(3, '0')}`;
-
-      promises.push(
-        QRCode.toDataURL(serialId).then(url => {
-          doc.addImage(url, 'PNG', x, y, size, size);
-          let textX = x + size / 2;
-          doc.text(serialId, textX, y + size + 5, { align: "center" });
-          x += size + space;
-          if (i % perRow === 0) {
-            x = margin;
-            y += size + 15;
-            if (y + size > 140) {
-              doc.addPage();
-              y = margin;
+    function startScan(mode) {
+      document.getElementById("reader").innerHTML = "";
+      document.getElementById("backButton").classList.remove("hidden");
+      html5QrCode = new Html5Qrcode("reader");
+      Html5Qrcode.getCameras().then(devices => {
+        if (devices.length) {
+          html5QrCode.start(
+            devices[0].id,
+            { fps: 10, qrbox: 250 },
+            message => {
+              html5QrCode.stop();
+              handleScan(message.trim(), mode);
             }
-          }
-        })
-      );
+          );
+        }
+      });
     }
 
-    Promise.all(promises).then(() => {
-      lastSerialNum += count;
-      localStorage.setItem('lastSerial', lastSerialNum.toString());
-      doc.save('qr-codes.pdf');
-    });
-  }
-
-  // Export entire history to Excel (CSV)
-  function exportHistoryToExcel() {
-    if (!historyLog.length) return alert('No history to export.');
-    const header = "Date,Type,Serial,Material\n";
-    const rows = historyLog.map(h => 
-      `"${h.date}","${h.type}","${h.id}","${h.material}"`
-    ).join("\n");
-    const csv = header + rows;
-
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'history.csv';
-    a.click();
-  }
-
-  // Reset history & stock (clears Firestore too!)
-  async function resetHistory() {
-    if (!confirm('Clear ALL data and history? This cannot be undone.')) return;
-
-    db = {};
-    historyLog = [];
-    saveDB();
-
-    try {
-      // Delete all documents in Firestore collections (warning: costly for big DB)
-      const materialsSnapshot = await dbFirebase.collection('materials').get();
-      materialsSnapshot.forEach(doc => dbFirebase.collection('materials').doc(doc.id).delete());
-
-      const historySnapshot = await dbFirebase.collection('history').get();
-      historySnapshot.forEach(doc => dbFirebase.collection('history').doc(doc.id).delete());
-
-      alert('All data cleared.');
-    } catch (e) {
-      alert('Error clearing Firestore: ' + e.message);
+    function stopScan() {
+      html5QrCode?.stop().then(() => {
+        document.getElementById("reader").innerHTML = "";
+        document.getElementById("backButton").classList.add("hidden");
+      });
     }
-  }
 
-  // Export filtered history by date and type
-  function exportFilteredHistory() {
-    const filterDate = document.getElementById('filterDate').value; // yyyy-mm-dd
-    const filterType = document.getElementById('filterType').value;
+    function handleScan(id, mode) {
+      const now = new Date().toLocaleString();
 
-    if (!filterDate && !filterType) return alert('Select at least one filter.');
-
-    const filtered = historyLog.filter(h => {
-      let match = true;
-      if (filterDate) {
-        // Compare date ignoring time
-        match = match && h.date.startsWith(filterDate);
+      if (mode === "add") {
+        if (materialDB[id]) return alert("Already exists!");
+        const name = prompt("Enter material name");
+        if (!name) return;
+        db.collection("materials").doc(id).set({ material: name });
+        db.collection("history").add({ date: now, type: "Add", id, material: name });
       }
-      if (filterType) {
-        match = match && h.type === filterType;
+
+      if (mode === "consume") {
+        if (!materialDB[id]) return alert("Not found!");
+        const name = materialDB[id];
+        if (confirm(`Consume "${name}"?`)) {
+          db.collection("materials").doc(id).delete();
+          db.collection("history").add({ date: now, type: "Consume", id, material: name });
+        }
       }
-      return match;
-    });
+    }
 
-    if (!filtered.length) return alert('No matching history records.');
+    function generateMultipleQRCodes() {
+      const count = parseInt(prompt("How many QR codes?"));
+      if (!count || count <= 0) return;
 
-    const header = "Date,Type,Serial,Material\n";
-    const rows = filtered.map(h => 
-      `"${h.date}","${h.type}","${h.id}","${h.material}"`
-    ).join("\n");
-    const csv = header + rows;
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ unit: "mm", format: [110, 150] });
+      let margin = 10, size = 20, space = 10, x = margin, y = margin, perRow = 4;
+      let promises = [];
 
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'filtered-history.csv';
-    a.click();
-  }
+      for (let i = 1; i <= count; i++) {
+        let serial = `ID${(Date.now() + i).toString().slice(-6)}`;
+        promises.push(
+          QRCode.toDataURL(serial).then(url => {
+            doc.addImage(url, "PNG", x, y, size, size);
+            doc.text(serial, x + size / 2, y + size + 5, { align: "center" });
+            x += size + space;
+            if (i % perRow === 0) { x = margin; y += size + 15; if (y + size > 140) { doc.addPage(); y = margin; } }
+          })
+        );
+      }
 
-  // Firestore realtime sync - updates local DB and UI live across devices
-  function subscribeToFirestoreUpdates() {
-    dbFirebase.collection('materials').onSnapshot(snapshot => {
-      db = {};
-      snapshot.forEach(doc => {
-        db[doc.id] = doc.data().material;
+      Promise.all(promises).then(() => doc.save("qr-codes.pdf"));
+    }
+
+    function exportHistoryToExcel() {
+      let csv = "Date,Type,Material\n";
+      historyLog.forEach(e => csv += `${e.date},${e.type},${e.material || "Unknown"}\n`);
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+      a.download = "history.csv"; a.click();
+    }
+
+    function exportFilteredHistory() {
+      const date = document.getElementById("filterDate").value;
+      const type = document.getElementById("filterType").value;
+
+      let csv = "Date,Type,Material\n";
+      historyLog.filter(e => (!date || e.date.startsWith(date)) && (!type || e.type === type))
+        .forEach(e => csv += `${e.date},${e.type},${e.material || "Unknown"}\n`);
+
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+      a.download = "filtered-history.csv"; a.click();
+    }
+
+    function resetHistory() {
+      if (!confirm("Clear all history?")) return;
+      db.collection("history").get().then(snapshot => {
+        const batch = db.batch();
+        snapshot.forEach(doc => batch.delete(doc.ref));
+        return batch.commit();
       });
-      saveDB();
-    });
-
-    dbFirebase.collection('history').orderBy('date').onSnapshot(snapshot => {
-      historyLog = [];
-      snapshot.forEach(doc => {
-        historyLog.push(doc.data());
-      });
-      saveDB();
-    });
-  }
-
-  // On page load
-  window.onload = () => {
-    // Load from localStorage first
-    const localDB = localStorage.getItem('materialDB');
-    const localHistory = localStorage.getItem('materialHistory');
-    if (localDB) db = JSON.parse(localDB);
-    if (localHistory) historyLog = JSON.parse(localHistory);
-
-    renderList();
-
-    // Start Firestore realtime listener for live sync
-    subscribeToFirestoreUpdates();
-  }
-</script>
+    }
+  </script>
 </body>
 </html>

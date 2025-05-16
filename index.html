@@ -84,6 +84,7 @@
       Html5Qrcode.getCameras().then(devices => {
         if (devices.length) {
           html5QrCode.start(
+            { facingMode: "environment" },
             devices[0].id,
             { fps: 10, qrbox: 250 },
             message => {

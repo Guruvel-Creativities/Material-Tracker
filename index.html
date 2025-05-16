@@ -124,46 +124,57 @@
     }
 
     async function generateMultipleQRCodes() {
-      const count = parseInt(prompt("How many QR codes?"));
-      if (!count || count <= 0) return;
+  const count = parseInt(prompt("How many QR codes?"));
+  if (!count || count <= 0) return;
 
-      // Find max existing ID
-      const snapshot = await db.collection("materials").get();
-      let maxID = 0;
-      snapshot.forEach(doc => {
-        const match = doc.id.match(/^ID(\d+)$/);
-        if (match) {
-          maxID = Math.max(maxID, parseInt(match[1]));
-        }
-      });
+  let maxID = 0;
 
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF({ unit: "mm", format: [110, 150] });
-      let margin = 10, size = 20, space = 10, x = margin, y = margin, perRow = 3;
-      let promises = [];
-
-      for (let i = 1; i <= count; i++) {
-        let newID = maxID + i;
-        let serial = `ID${newID}`;
-        promises.push(
-          QRCode.toDataURL(serial).then(url => {
-            doc.addImage(url, "PNG", x, y, size, size);
-            doc.text(serial, x + size / 2, y + size + 5, { align: "center" });
-            x += size + space;
-            if (i % perRow === 0) {
-              x = margin;
-              y += size + 15;
-              if (y + size > 140) {
-                doc.addPage();
-                y = margin;
-              }
-            }
-          })
-        );
-      }
-
-      Promise.all(promises).then(() => doc.save("qr-codes.pdf"));
+  // Check max ID in materials
+  const matSnap = await db.collection("materials").get();
+  matSnap.forEach(doc => {
+    const match = doc.id.match(/^ID(\d+)$/);
+    if (match) {
+      maxID = Math.max(maxID, parseInt(match[1]));
     }
+  });
+
+  // Check max ID in history
+  const histSnap = await db.collection("history").get();
+  histSnap.forEach(doc => {
+    const match = doc.data().id?.match(/^ID(\d+)$/);
+    if (match) {
+      maxID = Math.max(maxID, parseInt(match[1]));
+    }
+  });
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: "mm", format: [110, 150] });
+  let margin = 10, size = 20, space = 10, x = margin, y = margin, perRow = 3;
+  let promises = [];
+
+  for (let i = 1; i <= count; i++) {
+    let newID = maxID + i;
+    let serial = `ID${newID}`;
+    promises.push(
+      QRCode.toDataURL(serial).then(url => {
+        doc.addImage(url, "PNG", x, y, size, size);
+        doc.text(serial, x + size / 2, y + size + 5, { align: "center" });
+        x += size + space;
+        if (i % perRow === 0) {
+          x = margin;
+          y += size + 15;
+          if (y + size > 140) {
+            doc.addPage();
+            y = margin;
+          }
+        }
+      })
+    );
+  }
+
+  Promise.all(promises).then(() => doc.save("qr-codes.pdf"));
+}
+
 
     function exportHistoryToExcel() {
       let csv = "Date,Type,Material\n";

@@ -128,22 +128,27 @@
   if (!count || count <= 0) return;
 
   let maxID = 0;
+  const idSet = new Set();
 
-  // Check max ID in materials
+  // Collect IDs from materials
   const matSnap = await db.collection("materials").get();
-  matSnap.forEach(doc => {
-    const match = doc.id.match(/^ID(\d+)$/);
-    if (match) {
-      maxID = Math.max(maxID, parseInt(match[1]));
-    }
-  });
+  matSnap.forEach(doc => idSet.add(doc.id));
 
-  // Check max ID in history
+  // Collect IDs from history
   const histSnap = await db.collection("history").get();
   histSnap.forEach(doc => {
-    const match = doc.data().id?.match(/^ID(\d+)$/);
+    const data = doc.data();
+    if (data.id) idSet.add(data.id);
+  });
+
+  // Extract the largest number from IDs like ID001234
+  idSet.forEach(id => {
+    const match = id.match(/^ID(\d+)$/);
     if (match) {
-      maxID = Math.max(maxID, parseInt(match[1]));
+      const num = parseInt(match[1]);
+      if (!isNaN(num)) {
+        maxID = Math.max(maxID, num);
+      }
     }
   });
 
@@ -174,6 +179,7 @@
 
   Promise.all(promises).then(() => doc.save("qr-codes.pdf"));
 }
+
 
 
     function exportHistoryToExcel() {

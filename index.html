@@ -211,8 +211,9 @@
         alert('Material consumed successfully.');
       }
     }
-async function generateMultipleQRCodes() {
-  const input = prompt("How many QR codes do you want to generate?", "10");
+
+    async function generateMultipleQRCodes() {
+  const input = prompt("How many QR codes do you want to generate?", "9");
   const count = parseInt(input);
 
   if (isNaN(count) || count <= 0) {
@@ -222,51 +223,62 @@ async function generateMultipleQRCodes() {
 
   const { jsPDF } = window.jspdf;
 
-  // Set paper size to 100mm x 150mm (converted to pt)
   const mmToPt = mm => mm * 2.83465;
+  const pageWidth = mmToPt(100);
+  const pageHeight = mmToPt(150);
+
   const pdf = new jsPDF({
     orientation: "portrait",
     unit: "pt",
-    format: [mmToPt(100), mmToPt(150)]
+    format: [pageWidth, pageHeight]
   });
+
+  const qrSize = 60;
+  const marginX = 20;
+  const marginY = 20;
+  const spacingX = 90; // horizontal space between QR codes
+  const spacingY = 90; // vertical space between QR codes
 
   pdf.setFontSize(10);
 
   const startNum = lastSerialNum + 1;
   const endNum = startNum + count - 1;
 
-  let x = 20, y = 20;
-  let qrPerPage = 0;
+  let x = marginX;
+  let y = marginY;
+  let col = 0;
 
   for (let i = startNum; i <= endNum; i++) {
     const serial = `ID${String(i).padStart(3, '0')}`;
     const qrCanvas = document.createElement("canvas");
 
-    await QRCode.toCanvas(qrCanvas, serial, { width: 100, margin: 1 });
+    await QRCode.toCanvas(qrCanvas, serial, { width: qrSize, margin: 1 });
     const imgData = qrCanvas.toDataURL("image/png");
 
-    pdf.addImage(imgData, 'PNG', x, y, 60, 60);
-    pdf.text(serial, x, y + 70);
+    pdf.addImage(imgData, 'PNG', x, y, qrSize, qrSize);
+    pdf.text(serial, x, y + qrSize + 10);
 
-    y += 90;
-    qrPerPage++;
-
-    if (y > mmToPt(150) - 80) {
-      pdf.addPage();
-      y = 20;
-      qrPerPage = 0;
+    col++;
+    if (col === 3) {
+      col = 0;
+      x = marginX;
+      y += spacingY;
+      if (y + qrSize + 30 > pageHeight) {
+        pdf.addPage();
+        y = marginY;
+      }
+    } else {
+      x += spacingX;
     }
   }
 
   pdf.save("QR_Codes.pdf");
 
-  // Update last serial number for next generation
   lastSerialNum = endNum;
   localStorage.setItem('lastSerial', lastSerialNum.toString());
 
   alert(`Generated ${count} QR codes from ID${String(startNum).padStart(3, '0')} to ID${String(endNum).padStart(3, '0')}.`);
 }
-
 
     // Export history to CSV Excel-compatible
     function exportHistoryToExcel() {

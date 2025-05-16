@@ -223,10 +223,10 @@ async function generateMultipleQRCodes() {
 
   const { jsPDF } = window.jspdf;
 
-  // Convert mm to pt for jsPDF
+  // Convert mm to points (PDF uses points internally)
   const mmToPt = mm => mm * 2.83465;
-  const pageWidth = mmToPt(100);  // 100 mm width
-  const pageHeight = mmToPt(150); // 150 mm height
+  const pageWidth = mmToPt(100);
+  const pageHeight = mmToPt(150);
 
   const pdf = new jsPDF({
     orientation: "portrait",
@@ -234,52 +234,56 @@ async function generateMultipleQRCodes() {
     format: [pageWidth, pageHeight]
   });
 
-  const qrSize = mmToPt(15);  // QR size 25mm
-  const marginX = mmToPt(10); // left margin 10mm
-  const marginY = mmToPt(10); // top margin 10mm
-  const spacingX = qrSize + mmToPt(10);  // horizontal spacing = QR + 10mm gap
-  const spacingY = qrSize + mmToPt(20);  // vertical spacing = QR + 20mm gap (for text)
+  const qrSizeMM = 19;
+  const qrSize = mmToPt(qrSizeMM);  // QR size in points
+  const marginX = mmToPt(10);
+  const marginY = mmToPt(10);
+  const spacingX = mmToPt(15); // horizontal spacing between QR codes
+  const spacingY = mmToPt(25); // vertical spacing between QR rows
 
-  pdf.setFontSize(12);
+  pdf.setFontSize(10);
+
+  const startNum = lastSerialNum + 1;
+  const endNum = startNum + count - 1;
 
   let x = marginX;
   let y = marginY;
   let col = 0;
-  let lastSerialNum = parseInt(localStorage.getItem('lastSerial')) || 500; // example start point
-  const startNum = lastSerialNum + 1;
-  const endNum = startNum + count - 1;
 
   for (let i = startNum; i <= endNum; i++) {
     const serial = `ID${String(i).padStart(3, '0')}`;
-
-    // Create canvas for QR code generation
     const qrCanvas = document.createElement("canvas");
-    await QRCode.toCanvas(qrCanvas, serial, { width: qrSize, margin: 1 });
+
+    await QRCode.toCanvas(qrCanvas, serial, { width: qrSizeMM * 3.78, margin: 1 }); 
+    // Note: 1 mm ≈ 3.78 px for canvas sizing
 
     const imgData = qrCanvas.toDataURL("image/png");
+
     pdf.addImage(imgData, 'PNG', x, y, qrSize, qrSize);
+    // Center text below QR code:
     pdf.text(serial, x + qrSize / 2, y + qrSize + mmToPt(5), { align: "center" });
 
     col++;
-    if (col === 3) {  // 3 QR per row
+    if (col === 3) {
       col = 0;
       x = marginX;
       y += spacingY;
-      if (y + qrSize + mmToPt(20) > pageHeight) {
+      if (y + qrSize + mmToPt(10) > pageHeight) {
         pdf.addPage();
         y = marginY;
       }
     } else {
-      x += spacingX;
+      x += qrSize + spacingX;
     }
   }
 
   pdf.save("QR_Codes.pdf");
 
-  localStorage.setItem('lastSerial', endNum.toString());
+  lastSerialNum = endNum;
+  localStorage.setItem('lastSerial', lastSerialNum.toString());
+
   alert(`Generated ${count} QR codes from ID${String(startNum).padStart(3, '0')} to ID${String(endNum).padStart(3, '0')}.`);
 }
-
 
     // Export history to CSV Excel-compatible
     function exportHistoryToExcel() {

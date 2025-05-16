@@ -6,14 +6,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Guruvel Creativities Inventory</title>
 
-  <!-- Tailwind CSS CDN for styling -->
+  <!-- Tailwind CSS CDN (only for dev/testing, not recommended in production) -->
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- Html5Qrcode library for QR scanning -->
+  <!-- Html5Qrcode library -->
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 
-  <!-- Firebase libraries -->
+  <!-- jsPDF for PDF generation -->
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
+  <!-- QRCode library -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js"></script>
+
+  <!-- Firebase App (compat) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <!-- Firebase Firestore (compat) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 </head>
 
@@ -27,15 +34,41 @@
     </div>
 
     <div class="flex flex-wrap gap-3 mb-6">
-      <button class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded shadow transition"
+      <button
+        class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded shadow transition"
         onclick="startScan('add')">➕ Add Stock</button>
-      <button class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded shadow transition"
+      <button
+        class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded shadow transition"
         onclick="startScan('consume')">➖ Consume</button>
-      <!-- You can add generate QR code and export buttons here -->
+      <button
+        class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded shadow transition"
+        onclick="generateMultipleQRCodes()">📄 Generate QR Codes</button>
+      <button
+        class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded shadow transition"
+        onclick="exportHistoryToExcel()">📤 Export History</button>
+      <button
+        class="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded shadow transition"
+        onclick="resetHistory()">🗑️ Reset History</button>
     </div>
 
-    <div id="reader" class="w-full rounded border border-gray-300 bg-gray-50 p-3 mb-4"></div>
-    <button id="backButton" class="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-4 rounded shadow transition mb-6 hidden"
+    <div class="flex flex-wrap gap-3 items-center mb-6">
+      <input type="date" id="filterDate"
+        class="border border-gray-300 rounded px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+      <select id="filterType"
+        class="border border-gray-300 rounded px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        <option value="">All Types</option>
+        <option value="Add">Add</option>
+        <option value="Consume">Consume</option>
+      </select>
+      <button
+        class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded shadow transition"
+        onclick="exportFilteredHistory()">📁 Export Filtered</button>
+    </div>
+
+    <!-- QR Code Scanner Container -->
+    <div id="reader" class="w-full rounded border border-gray-300 bg-gray-50 p-3 mb-4" style="min-height:360px;"></div>
+    <button id="backButton"
+      class="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-4 rounded shadow transition mb-6 hidden"
       onclick="stopScan()">⬅️ Go Back</button>
 
     <div class="bg-gray-50 rounded p-4 shadow-inner">
@@ -47,7 +80,7 @@
   </div>
 
   <script>
-    // Your Firebase config here
+    // Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyBmXJZ6dm-SLzzIvz9P22kXI23MwdW3WC0",
       authDomain: "material-tracker-49dac.firebaseapp.com",
@@ -61,20 +94,20 @@
     firebase.initializeApp(firebaseConfig);
     const dbFirebase = firebase.firestore();
 
-    // Local storage keys and data holders
-    let db = {};
-    let historyLog = [];
+    let db = {};            // {serial: material}
+    let historyLog = [];    // array of history entries
     let html5QrCode;
     let lastSerialNum = parseInt(localStorage.getItem('lastSerial') || '0');
+    let currentScanMode = null;
 
-    // Save DB and history to localStorage
+    // Save to localStorage for cache
     function saveDB() {
       localStorage.setItem('materialDB', JSON.stringify(db));
       localStorage.setItem('materialHistory', JSON.stringify(historyLog));
       renderList();
     }
 
-    // Render current stock list
+    // Render current stock grouped by material
     function renderList() {
       let stock = {};
       for (let serial in db) {
@@ -85,143 +118,233 @@
       document.getElementById('stockList').innerHTML = html || '<i>No materials in stock.</i>';
     }
 
-    // Start scanning QR codes for 'add' or 'consume' mode
-    async function startScan(mode) {
+    // Start scanning QR with improved config for better capture
+    function startScan(mode) {
+      currentScanMode = mode;
+      const readerElement = document.getElementById("reader");
       document.getElementById("backButton").style.display = "inline";
+      readerElement.innerHTML = ""; // clear previous
+
+      if (html5QrCode) {
+        html5QrCode.stop().catch(() => { });
+      }
+
       html5QrCode = new Html5Qrcode("reader");
 
-      try {
-        const devices = await Html5Qrcode.getCameras();
-        if (!devices || devices.length === 0) {
-          alert("No camera found on this device.");
-          return;
+      Html5Qrcode.getCameras().then(devices => {
+        if (devices && devices.length) {
+          // Use environment (back) camera if available
+          const camera = devices.find(device => device.label.toLowerCase().includes("back")) || devices[0];
+          html5QrCode.start(
+            { deviceId: camera.id, facingMode: "environment" },
+            {
+              fps: 20,
+              qrbox: { width: 300, height: 300 },
+              aspectRatio: 1,
+              disableFlip: false,
+              verbose: false,
+            },
+            qrCodeMessage => {
+              html5QrCode.stop().then(() => {
+                handleScan(qrCodeMessage, currentScanMode);
+                stopScan(); // Hide scanner after success
+              });
+            },
+            errorMessage => {
+              // Optionally show scan errors to console
+              // console.log("QR Scan error:", errorMessage);
+            }
+          ).catch(err => alert("Unable to start scanning: " + err));
+        } else {
+          alert("No cameras found on this device.");
         }
-        // Prefer back camera if available
-        const backCamera = devices.find(dev => dev.label.toLowerCase().includes("back")) || devices[0];
-
-        await html5QrCode.start(
-          { deviceId: backCamera.id },
-          {
-            fps: 20,                      // frames per second for scanning
-            qrbox: { width: 300, height: 300 }, // scanning box size
-            aspectRatio: 1.0,
-            disableFlip: false
-          },
-          qrCodeMessage => {
-            html5QrCode.stop();
-            handleScan(qrCodeMessage, mode);
-          },
-          errorMessage => {
-            // Optionally log scan errors here
-            // console.debug("QR Code scan error:", errorMessage);
-          }
-        );
-      } catch (err) {
-        alert("Unable to start scanning: " + err);
-      }
+      }).catch(err => alert("Camera error: " + err));
     }
 
-    // Stop scanning and clean UI
+    // Stop scanning and hide scanner
     function stopScan() {
       if (html5QrCode) {
         html5QrCode.stop().then(() => {
           document.getElementById("backButton").style.display = "none";
           document.getElementById("reader").innerHTML = "";
-        }).catch(err => {
-          alert("Error stopping the scanner: " + err);
+        }).catch(() => {
+          document.getElementById("backButton").style.display = "none";
+          document.getElementById("reader").innerHTML = "";
         });
+      } else {
+        document.getElementById("backButton").style.display = "none";
+        document.getElementById("reader").innerHTML = "";
       }
     }
 
-    // Handle scanned QR code data
+    // Handle scanned QR codes: Add or Consume materials + update Firestore
     async function handleScan(serial, mode) {
       serial = serial.trim();
-
-      // Add stock flow
-      if (mode === 'add' && /^ID\d{3,}$/.test(serial)) {
-        let material = prompt("Enter or select material name:", "NodeMCU");
-        if (!material) {
-          return alert("Material name is required to add.");
-        }
-        material = material.trim();
-        if (db[serial]) return alert('Already added.');
-
-        db[serial] = material;
-        const now = new Date().toISOString();
-        const historyEntry = { date: now, type: 'Add', id: serial, material };
-        historyLog.push(historyEntry);
-        saveDB();
-
-        try {
-          await dbFirebase.collection('materials').doc(serial).set({
-            material,
-            addedAt: firebase.firestore.FieldValue.serverTimestamp()
-          });
-          await dbFirebase.collection('history').add(historyEntry);
-        } catch (e) {
-          alert("Firestore save error: " + e.message);
-        }
-
-        alert('Material added successfully.');
+      if (!serial) {
+        alert("Empty QR code scanned");
         return;
       }
-
-      // If scanned code is not serial ID for 'add' mode, assign new serial
+      let materialName;
       if (mode === 'add') {
-        if (db[serial]) return alert('Already added.');
-
-        lastSerialNum++;
-        const newSerial = 'ID' + lastSerialNum.toString().padStart(3, '0');
-        db[newSerial] = serial;
-        const now = new Date().toISOString();
-        const historyEntry = { date: now, type: 'Add', id: newSerial, material: serial };
-        historyLog.push(historyEntry);
-        saveDB();
-        localStorage.setItem('lastSerial', lastSerialNum);
-
-        try {
-          await dbFirebase.collection('materials').doc(newSerial).set({
-            material: serial,
-            addedAt: firebase.firestore.FieldValue.serverTimestamp()
-          });
-          await dbFirebase.collection('history').add(historyEntry);
-        } catch (e) {
-          alert("Firestore save error: " + e.message);
+        materialName = prompt("Enter material name for serial " + serial);
+        if (!materialName) {
+          alert("Material name is required to add.");
+          return;
         }
-
-        alert('Material added with new serial: ' + newSerial);
+        if (db[serial]) {
+          alert("This serial number already exists in stock.");
+          return;
+        }
+        db[serial] = materialName;
+        await dbFirebase.collection("materials").doc(serial).set({
+          material: materialName,
+          serial: serial,
+          timestamp: new Date(),
+        });
+        historyLog.push({ type: "Add", serial: serial, material: materialName, date: new Date().toISOString() });
+        alert(`Added material "${materialName}" with serial ${serial}`);
+      } else if (mode === 'consume') {
+        if (!db[serial]) {
+          alert("Serial not found in stock. Cannot consume.");
+          return;
+        }
+        materialName = db[serial];
+        delete db[serial];
+        await dbFirebase.collection("materials").doc(serial).delete();
+        historyLog.push({ type: "Consume", serial: serial, material: materialName, date: new Date().toISOString() });
+        alert(`Consumed material "${materialName}" with serial ${serial}`);
+      } else {
+        alert("Unknown scan mode");
         return;
       }
+      saveDB();
+    }
 
-      // Consume stock flow
-      if (mode === 'consume') {
-        if (!db[serial]) return alert('Not in stock.');
+    // Generate multiple QR codes for material (for printing)
+    function generateMultipleQRCodes() {
+      const material = prompt("Enter material name:");
+      if (!material) return;
+      const countStr = prompt("How many QR codes to generate?");
+      const count = parseInt(countStr);
+      if (isNaN(count) || count <= 0) return alert("Invalid number");
 
-        const material = db[serial];
-        delete db[serial];
-        const now = new Date().toISOString();
-        const historyEntry = { date: now, type: 'Consume', id: serial, material };
-        historyLog.push(historyEntry);
-        saveDB();
+      let startSerial = lastSerialNum + 1;
+      const doc = new jspdf.jsPDF();
+      const qrSize = 40;
+      let x = 10, y = 10;
+      const pageWidth = doc.internal.pageSize.getWidth();
 
-        try {
-          await dbFirebase.collection('history').add(historyEntry);
-          await dbFirebase.collection('materials').doc(serial).delete();
-        } catch (e) {
-          alert("Firestore save error: " + e.message);
+      for (let i = 0; i < count; i++) {
+        const serial = (startSerial + i).toString();
+        // Store material with serial
+        db[serial] = material;
+        // Draw QR code on canvas
+        const canvas = document.createElement('canvas');
+        QRCode.toCanvas(canvas, serial, { width: qrSize, margin: 1 }, err => {
+          if (err) {
+            console.error(err);
+            return;
+          }
+        });
+
+        // Add QR code image to PDF
+        const imgData = canvas.toDataURL("image/png");
+        doc.addImage(imgData, "PNG", x, y, qrSize, qrSize);
+        doc.text(material, x, y + qrSize + 5);
+        doc.text(`Serial: ${serial}`, x, y + qrSize + 12);
+
+        x += qrSize + 30;
+        if (x + qrSize > pageWidth - 10) {
+          x = 10;
+          y += qrSize + 25;
         }
+        if (y > doc.internal.pageSize.getHeight() - qrSize - 20) {
+          if (i !== count - 1) doc.addPage();
+          x = 10;
+          y = 10;
+        }
+      }
+      lastSerialNum += count;
+      localStorage.setItem('lastSerial', lastSerialNum.toString());
+      saveDB();
+      doc.save(`${material}_QRcodes.pdf`);
+    }
 
-        alert('Material consumed successfully.');
-        return;
+    // Export history to Excel CSV format
+    function exportHistoryToExcel() {
+      if (historyLog.length === 0) return alert("No history to export.");
+
+      let csvContent = "data:text/csv;charset=utf-8,";
+      csvContent += "Type,Serial,Material,Date\n";
+      historyLog.forEach(row => {
+        csvContent += `${row.type},${row.serial},${row.material},${row.date}\n`;
+      });
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", "material_history.csv");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    }
+
+    // Reset history (clear localStorage and Firestore not handled here)
+    function resetHistory() {
+      if (confirm("Are you sure you want to reset all stock and history?")) {
+        db = {};
+        historyLog = [];
+        localStorage.clear();
+        renderList();
+        alert("Reset complete.");
       }
     }
 
-    // Load data from localStorage on page load
-    window.onload = () => {
-      db = JSON.parse(localStorage.getItem('materialDB') || '{}');
-      historyLog = JSON.parse(localStorage.getItem('materialHistory') || '[]');
-      lastSerialNum = parseInt(localStorage.getItem('lastSerial') || '0');
+    // Export filtered history by date and type
+    function exportFilteredHistory() {
+      const dateFilter = document.getElementById("filterDate").value;
+      const typeFilter = document.getElementById("filterType").value;
+
+      let filtered = historyLog;
+
+      if (dateFilter) {
+        filtered = filtered.filter(item => item.date.startsWith(dateFilter));
+      }
+      if (typeFilter) {
+        filtered = filtered.filter(item => item.type === typeFilter);
+      }
+
+      if (filtered.length === 0) {
+        alert("No records match filter criteria.");
+        return;
+      }
+
+      let csvContent = "data:text/csv;charset=utf-8,";
+      csvContent += "Type,Serial,Material,Date\n";
+      filtered.forEach(row => {
+        csvContent += `${row.type},${row.serial},${row.material},${row.date}\n`;
+      });
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", "filtered_material_history.csv");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    }
+
+    // Load from localStorage on startup
+    function loadFromStorage() {
+      const dbString = localStorage.getItem('materialDB');
+      const histString = localStorage.getItem('materialHistory');
+      if (dbString) db = JSON.parse(dbString);
+      if (histString) historyLog = JSON.parse(histString);
       renderList();
+    }
+
+    window.onload = () => {
+      loadFromStorage();
     };
   </script>
 </body>

@@ -213,7 +213,7 @@
     }
 
 async function generateMultipleQRCodes() {
-  const input = prompt("How many QR codes do you want to generate?");
+  const input = prompt("How many QR codes do you want to generate?", "12");
   const count = parseInt(input);
 
   if (isNaN(count) || count <= 0) {
@@ -223,7 +223,6 @@ async function generateMultipleQRCodes() {
 
   const { jsPDF } = window.jspdf;
 
-  // Convert mm to points (PDF uses points internally)
   const mmToPt = mm => mm * 2.83465;
   const pageWidth = mmToPt(100);
   const pageHeight = mmToPt(150);
@@ -234,14 +233,14 @@ async function generateMultipleQRCodes() {
     format: [pageWidth, pageHeight]
   });
 
-  const qrSizeMM = 19;
-  const qrSize = mmToPt(qrSizeMM);  // QR size in points
-  const marginX = mmToPt(10);
+  const qrSizeMM = 16;
+  const qrSize = mmToPt(qrSizeMM);
+  const marginX = mmToPt(8);  // Reduced margin left/right
   const marginY = mmToPt(10);
-  const spacingX = mmToPt(15); // horizontal spacing between QR codes
-  const spacingY = mmToPt(25); // vertical spacing between QR rows
+  const spacingX = mmToPt(4); // Reduced horizontal spacing
+  const spacingY = mmToPt(30); // Slightly reduced vertical spacing
 
-  pdf.setFontSize(10);
+  pdf.setFontSize(12);
 
   const startNum = lastSerialNum + 1;
   const endNum = startNum + count - 1;
@@ -249,22 +248,20 @@ async function generateMultipleQRCodes() {
   let x = marginX;
   let y = marginY;
   let col = 0;
+  const perRow = 4; // 4 QR per row
 
   for (let i = startNum; i <= endNum; i++) {
     const serial = `ID${String(i).padStart(3, '0')}`;
     const qrCanvas = document.createElement("canvas");
 
-    await QRCode.toCanvas(qrCanvas, serial, { width: qrSizeMM * 3.78, margin: 1 }); 
-    // Note: 1 mm ≈ 3.78 px for canvas sizing
-
+    await QRCode.toCanvas(qrCanvas, serial, { width: qrSizeMM * 3.78, margin: 1 });
     const imgData = qrCanvas.toDataURL("image/png");
 
     pdf.addImage(imgData, 'PNG', x, y, qrSize, qrSize);
-    // Center text below QR code:
     pdf.text(serial, x + qrSize / 2, y + qrSize + mmToPt(5), { align: "center" });
 
     col++;
-    if (col === 3) {
+    if (col === perRow) {
       col = 0;
       x = marginX;
       y += spacingY;
@@ -284,6 +281,7 @@ async function generateMultipleQRCodes() {
 
   alert(`Generated ${count} QR codes from ID${String(startNum).padStart(3, '0')} to ID${String(endNum).padStart(3, '0')}.`);
 }
+
 
     // Export history to CSV Excel-compatible
     function exportHistoryToExcel() {

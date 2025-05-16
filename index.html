@@ -212,7 +212,7 @@
       }
     }
 
-    async function generateMultipleQRCodes() {
+   async function generateMultipleQRCodes() {
   const input = prompt("How many QR codes to generate?");
   const count = parseInt(input);
 
@@ -224,28 +224,28 @@
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({
     unit: 'mm',
-    format: [110, 150], // page size
+    format: [110, 150], // paper size
     orientation: "portrait"
   });
 
   const margin = 10;
-  const size = 20;
-  const spacing = 10;
-  const perRow = 4;
+  const size = 25;         // QR code size
+  const spacingX = 10;     // space between columns
+  const spacingY = 20;     // space between rows (with room for label)
+  const perRow = 3;
 
   let x = margin;
   let y = margin;
+  doc.setFontSize(8);
 
   const startNum = lastSerialNum + 1;
   const endNum = startNum + count - 1;
-
-  doc.setFontSize(8);
 
   for (let i = startNum; i <= endNum; i++) {
     const serial = `ID${String(i).padStart(3, '0')}`;
     const qrCanvas = document.createElement("canvas");
 
-    await QRCode.toCanvas(qrCanvas, serial, { width: size * 3, margin: 1 }); // size * 3 for higher resolution
+    await QRCode.toCanvas(qrCanvas, serial, { width: size * 3, margin: 1 });
     const imgData = qrCanvas.toDataURL("image/png");
 
     doc.addImage(imgData, 'PNG', x, y, size, size);
@@ -253,23 +253,24 @@
     const textWidth = doc.getTextWidth(serial);
     doc.text(serial, x + (size / 2) - (textWidth / 2), y + size + 4);
 
+    // Move to next column
     if ((i - startNum + 1) % perRow === 0) {
       x = margin;
-      y += size + spacing + 5;
+      y += size + spacingY;
 
-      if (y + size + 10 > 150) {
+      if (y + size > 150 - margin) {
         doc.addPage();
         y = margin;
       }
     } else {
-      x += size + spacing;
+      x += size + spacingX;
     }
   }
 
   lastSerialNum = endNum;
   localStorage.setItem('lastSerial', lastSerialNum.toString());
 
-  doc.save('qr-codes.pdf');
+  doc.save("qr-codes.pdf");
   alert(`Generated ${count} QR codes from ID${String(startNum).padStart(3, '0')} to ID${String(endNum).padStart(3, '0')}.`);
 }
 

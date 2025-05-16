@@ -6,18 +6,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Guruvel Creativities Inventory</title>
 
-  <!-- Tailwind CSS CDN -->
+  <!-- Tailwind CSS CDN for styling -->
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- Instascan JS for QR scanning -->
-  <script src="https://rawgit.com/schmich/instascan-builds/master/instascan.min.js"></script>
+  <!-- Html5Qrcode library for QR scanning -->
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 
-  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js"></script>
-
-  <!-- Firebase App (compat) -->
+  <!-- Firebase libraries -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-  <!-- Firebase Firestore (compat) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 </head>
 
@@ -31,39 +27,14 @@
     </div>
 
     <div class="flex flex-wrap gap-3 mb-6">
-      <button
-        class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded shadow transition"
+      <button class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded shadow transition"
         onclick="startScan('add')">➕ Add Stock</button>
-      <button
-        class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded shadow transition"
+      <button class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded shadow transition"
         onclick="startScan('consume')">➖ Consume</button>
-      <button
-        class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded shadow transition"
-        onclick="generateMultipleQRCodes()">📄 Generate QR Codes</button>
-      <button
-        class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded shadow transition"
-        onclick="exportHistoryToExcel()">📤 Export History</button>
-      <button
-        class="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded shadow transition"
-        onclick="resetHistory()">🗑️ Reset History</button>
+      <!-- You can add generate QR code and export buttons here -->
     </div>
 
-    <div class="flex flex-wrap gap-3 items-center mb-6">
-      <input type="date" id="filterDate"
-        class="border border-gray-300 rounded px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-      <select id="filterType"
-        class="border border-gray-300 rounded px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-        <option value="">All Types</option>
-        <option value="Add">Add</option>
-        <option value="Consume">Consume</option>
-      </select>
-      <button
-        class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded shadow transition"
-        onclick="exportFilteredHistory()">📁 Export Filtered</button>
-    </div>
-
-    <!-- Video preview for Instascan -->
-    <video id="preview" class="w-full rounded border border-gray-300 bg-gray-50 mb-4"></video>
+    <div id="reader" class="w-full rounded border border-gray-300 bg-gray-50 p-3 mb-4"></div>
     <button id="backButton" class="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-4 rounded shadow transition mb-6 hidden"
       onclick="stopScan()">⬅️ Go Back</button>
 
@@ -76,7 +47,7 @@
   </div>
 
   <script>
-    // Firebase config
+    // Your Firebase config here
     const firebaseConfig = {
       apiKey: "AIzaSyBmXJZ6dm-SLzzIvz9P22kXI23MwdW3WC0",
       authDomain: "material-tracker-49dac.firebaseapp.com",
@@ -86,23 +57,24 @@
       appId: "1:548291877330:web:94a5d62b40058ad480100b"
     };
 
+    // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
     const dbFirebase = firebase.firestore();
 
-    let db = {}; // {serial: material}
-    let historyLog = []; // array of history entries
-    let scanner; // Instascan.Scanner instance
-    let currentMode = null; // 'add' or 'consume'
+    // Local storage keys and data holders
+    let db = {};
+    let historyLog = [];
+    let html5QrCode;
     let lastSerialNum = parseInt(localStorage.getItem('lastSerial') || '0');
 
-    // Save to localStorage for cache
+    // Save DB and history to localStorage
     function saveDB() {
       localStorage.setItem('materialDB', JSON.stringify(db));
       localStorage.setItem('materialHistory', JSON.stringify(historyLog));
       renderList();
     }
 
-    // Render current stock grouped by material
+    // Render current stock list
     function renderList() {
       let stock = {};
       for (let serial in db) {
@@ -113,43 +85,59 @@
       document.getElementById('stockList').innerHTML = html || '<i>No materials in stock.</i>';
     }
 
-    // Start scanning with Instascan
-    function startScan(mode) {
-      currentMode = mode;
+    // Start scanning QR codes for 'add' or 'consume' mode
+    async function startScan(mode) {
       document.getElementById("backButton").style.display = "inline";
-      const videoElement = document.getElementById('preview');
+      html5QrCode = new Html5Qrcode("reader");
 
-      if (!scanner) {
-        scanner = new Instascan.Scanner({ video: videoElement, mirror: false });
-        scanner.addListener('scan', function (content) {
-          stopScan();
-          handleScan(content.trim(), currentMode);
+      try {
+        const devices = await Html5Qrcode.getCameras();
+        if (!devices || devices.length === 0) {
+          alert("No camera found on this device.");
+          return;
+        }
+        // Prefer back camera if available
+        const backCamera = devices.find(dev => dev.label.toLowerCase().includes("back")) || devices[0];
+
+        await html5QrCode.start(
+          { deviceId: backCamera.id },
+          {
+            fps: 20,                      // frames per second for scanning
+            qrbox: { width: 300, height: 300 }, // scanning box size
+            aspectRatio: 1.0,
+            disableFlip: false
+          },
+          qrCodeMessage => {
+            html5QrCode.stop();
+            handleScan(qrCodeMessage, mode);
+          },
+          errorMessage => {
+            // Optionally log scan errors here
+            // console.debug("QR Code scan error:", errorMessage);
+          }
+        );
+      } catch (err) {
+        alert("Unable to start scanning: " + err);
+      }
+    }
+
+    // Stop scanning and clean UI
+    function stopScan() {
+      if (html5QrCode) {
+        html5QrCode.stop().then(() => {
+          document.getElementById("backButton").style.display = "none";
+          document.getElementById("reader").innerHTML = "";
+        }).catch(err => {
+          alert("Error stopping the scanner: " + err);
         });
       }
-
-      Instascan.Camera.getCameras().then(cameras => {
-        if (cameras.length > 0) {
-          // Try to use back camera first
-          let selectedCam = cameras.find(cam => cam.name.toLowerCase().includes('back')) || cameras[0];
-          scanner.start(selectedCam).catch(e => alert('Error starting scanner: ' + e));
-        } else {
-          alert('No cameras found.');
-        }
-      }).catch(e => alert('Error getting cameras: ' + e));
     }
 
-    // Stop scanning
-    function stopScan() {
-      if (scanner) {
-        scanner.stop();
-      }
-      document.getElementById("backButton").style.display = "none";
-      const videoElement = document.getElementById('preview');
-      videoElement.srcObject = null;
-    }
-
-    // Handle scanned QR codes: Add or Consume materials + update Firestore
+    // Handle scanned QR code data
     async function handleScan(serial, mode) {
+      serial = serial.trim();
+
+      // Add stock flow
       if (mode === 'add' && /^ID\d{3,}$/.test(serial)) {
         let material = prompt("Enter or select material name:", "NodeMCU");
         if (!material) {
@@ -178,24 +166,22 @@
         return;
       }
 
+      // If scanned code is not serial ID for 'add' mode, assign new serial
       if (mode === 'add') {
         if (db[serial]) return alert('Already added.');
 
-        let material = prompt("Enter or select material name:", "NodeMCU");
-        if (!material) {
-          return alert("Material name is required to add.");
-        }
-        material = material.trim();
-
-        db[serial] = material;
+        lastSerialNum++;
+        const newSerial = 'ID' + lastSerialNum.toString().padStart(3, '0');
+        db[newSerial] = serial;
         const now = new Date().toISOString();
-        const historyEntry = { date: now, type: 'Add', id: serial, material };
+        const historyEntry = { date: now, type: 'Add', id: newSerial, material: serial };
         historyLog.push(historyEntry);
         saveDB();
+        localStorage.setItem('lastSerial', lastSerialNum);
 
         try {
-          await dbFirebase.collection('materials').doc(serial).set({
-            material,
+          await dbFirebase.collection('materials').doc(newSerial).set({
+            material: serial,
             addedAt: firebase.firestore.FieldValue.serverTimestamp()
           });
           await dbFirebase.collection('history').add(historyEntry);
@@ -203,13 +189,13 @@
           alert("Firestore save error: " + e.message);
         }
 
-        alert('Material added successfully.');
+        alert('Material added with new serial: ' + newSerial);
         return;
       }
 
-      // Consume mode
+      // Consume stock flow
       if (mode === 'consume') {
-        if (!db[serial]) return alert('Material not in stock.');
+        if (!db[serial]) return alert('Not in stock.');
 
         const material = db[serial];
         delete db[serial];
@@ -219,71 +205,24 @@
         saveDB();
 
         try {
-          await dbFirebase.collection('materials').doc(serial).delete();
           await dbFirebase.collection('history').add(historyEntry);
+          await dbFirebase.collection('materials').doc(serial).delete();
         } catch (e) {
-          alert("Firestore update error: " + e.message);
+          alert("Firestore save error: " + e.message);
         }
 
         alert('Material consumed successfully.');
         return;
       }
-
-      alert("Invalid scan or mode.");
     }
 
-    // Export history as CSV (simplified)
-    function exportHistoryToExcel() {
-      if (historyLog.length === 0) return alert('No history to export.');
-
-      const rows = historyLog.map(h => [h.date, h.type, h.id, h.material]);
-      let csvContent = "data:text/csv;charset=utf-8,Date,Type,Serial,Material\n";
-      rows.forEach(row => {
-        csvContent += row.join(",") + "\n";
-      });
-
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      link.setAttribute("download", "material_history.csv");
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
-
-    // Reset history with confirmation
-    function resetHistory() {
-      if (!confirm('Are you sure you want to reset the entire history? This action cannot be undone.')) return;
-
-      historyLog = [];
-      db = {};
-      saveDB();
-
-      // Clear Firestore collections (optional: only for development, handle carefully)
-      // You could write a cloud function or admin script for this in production.
-      alert('History and stock reset.');
-    }
-
-    // Filter export (optional to implement)
-    function exportFilteredHistory() {
-      alert('Filtering export not implemented yet.');
-    }
-
-    // Generate multiple QR codes - placeholder, you can expand this with QRCode lib
-    function generateMultipleQRCodes() {
-      alert('QR code generation not implemented yet.');
-    }
-
-    // Load saved DB and history from localStorage on page load
-    function loadData() {
-      let storedDB = localStorage.getItem('materialDB');
-      let storedHistory = localStorage.getItem('materialHistory');
-      if (storedDB) db = JSON.parse(storedDB);
-      if (storedHistory) historyLog = JSON.parse(storedHistory);
+    // Load data from localStorage on page load
+    window.onload = () => {
+      db = JSON.parse(localStorage.getItem('materialDB') || '{}');
+      historyLog = JSON.parse(localStorage.getItem('materialHistory') || '[]');
+      lastSerialNum = parseInt(localStorage.getItem('lastSerial') || '0');
       renderList();
-    }
-
-    loadData();
+    };
   </script>
 </body>
 

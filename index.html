@@ -234,13 +234,13 @@ async function generateMultipleQRCodes() {
     format: [pageWidth, pageHeight]
   });
 
-  const qrSize = mmToPt(25);  // QR size 25mm
+  const qrSize = mmToPt(15);  // QR size 25mm
   const marginX = mmToPt(10); // left margin 10mm
   const marginY = mmToPt(10); // top margin 10mm
   const spacingX = qrSize + mmToPt(10);  // horizontal spacing = QR + 10mm gap
   const spacingY = qrSize + mmToPt(20);  // vertical spacing = QR + 20mm gap (for text)
 
-  pdf.setFontSize(9);
+  pdf.setFontSize(12);
 
   let x = marginX;
   let y = marginY;

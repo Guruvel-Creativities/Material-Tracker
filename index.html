@@ -114,16 +114,14 @@
           const backCamera = devices.find(d => d.label.toLowerCase().includes("back")) || devices[0];
           html5QrCode.start(
             backCamera.id,
-            { fps: 30, qrbox: 150 },
+            { fps: 10, qrbox: 250 },
             qrCodeMessage => {
               html5QrCode.stop();
               handleScan(qrCodeMessage, mode);
             }
           ).catch(err => alert("Scan error: " + err));
-        } else {
-          alert("No camera devices found.");
         }
-      }).catch(err => alert("Camera error: " + err));
+      });
     }
 
     function stopScan() {
@@ -137,21 +135,15 @@
 
     // Handle scanned QR codes: Add or Consume materials + update Firestore
     async function handleScan(serial, mode) {
-      serial = serial.trim().toUpperCase(); // normalize to uppercase and trimmed
-      console.log('Scanned serial:', serial);
-      console.log('Current DB keys:', Object.keys(db));
+      serial = serial.trim();
 
       if (mode === 'add' && /^ID\d{3,}$/.test(serial)) {
-
-        if (db[serial]) {
-          return alert('This QR code is already registered.');
-        }
-
         let material = prompt("Enter or select material name:", "NodeMCU");
         if (!material) {
           return alert("Material name is required to add.");
         }
         material = material.trim();
+        if (db[serial]) return alert('Already added.');
 
         db[serial] = material;
         const now = new Date().toISOString();
@@ -174,9 +166,7 @@
       }
 
       if (mode === 'add') {
-        if (db[serial]) {
-          return alert('This QR code is already registered.');
-        }
+        if (db[serial]) return alert('Already added.');
 
         let material = prompt("Enter or select material name:", "NodeMCU");
         if (material) {
@@ -199,17 +189,14 @@
 
           alert('Material added successfully.');
           return;
-        } else {
-          return alert("Material name is required.");
         }
+        return alert("Invalid serial or material.");
       }
 
       if (mode === 'consume') {
-        if (!db[serial]) {
-          return alert("This material doesn't exist or already consumed.");
-        }
+        if (!db[serial]) return alert('Material not found.');
 
-        let material = db[serial];
+        const material = db[serial];
         delete db[serial];
         const now = new Date().toISOString();
         const historyEntry = { date: now, type: 'Consume', id: serial, material };
@@ -220,32 +207,44 @@
           await dbFirebase.collection('materials').doc(serial).delete();
           await dbFirebase.collection('history').add(historyEntry);
         } catch (e) {
-          alert("Firestore update error: " + e.message);
+          alert("Firestore save error: " + e.message);
         }
 
         alert(`Consumed material: ${material}`);
         return;
       }
 
-      alert("Invalid scan or mode.");
+      alert("Unknown mode.");
     }
 
-    // Export history to Excel (simple CSV)
+    // Export all history to Excel CSV
     function exportHistoryToExcel() {
-      let csvContent = "data:text/csv;charset=utf-8,Date,Type,ID,Material\n";
-      historyLog.forEach(e => {
-        csvContent += `${e.date},${e.type},${e.id},${e.material}\n`;
-      });
-      const encodedUri = encodeURI(csvContent);
+      if (!historyLog.length) return alert("No history to export.");
+
+      const header = ['Date', 'Type', 'ID', 'Material'];
+      const rows = historyLog.map(h => [h.date, h.type, h.id, h.material]);
+      const csvContent = [header, ...rows].map(e => e.join(",")).join("\n");
+
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+
       const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      link.setAttribute("download", "material_history.csv");
-      document.body.appendChild(link);
+      link.href = url;
+      link.download = "material_history.csv";
       link.click();
-      document.body.removeChild(link);
+
+      URL.revokeObjectURL(url);
     }
 
-    // Export filtered history by date/type
+    // Reset history log
+    function resetHistory() {
+      if (!confirm("Clear entire history log?")) return;
+      historyLog = [];
+      saveDB();
+      alert("History log reset.");
+    }
+
+    // Filtering & exporting filtered data
     function exportFilteredHistory() {
       const filterDate = document.getElementById('filterDate').value;
       const filterType = document.getElementById('filterType').value;
@@ -258,126 +257,174 @@
       if (filterType) {
         filtered = filtered.filter(e => e.type === filterType);
       }
+      if (!filtered.length) return alert("No records match filter.");
 
-      if (!filtered.length) {
-        return alert("No records found for filters.");
-      }
+      const header = ['Date', 'Type', 'ID', 'Material'];
+      const rows = filtered.map(h => [h.date, h.type, h.id, h.material]);
+      const csvContent = [header, ...rows].map(e => e.join(",")).join("\n");
 
-      let csvContent = "data:text/csv;charset=utf-8,Date,Type,ID,Material\n";
-      filtered.forEach(e => {
-        csvContent += `${e.date},${e.type},${e.id},${e.material}\n`;
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "filtered_material_history.csv";
+      link.click();
+
+      URL.revokeObjectURL(url);
+    }
+
+async function generateMultipleQRCodes() {
+  // Get quantity from user
+  const count = parseInt(prompt("How many QR codes to generate?", "10"));
+  if (isNaN(count) || count <= 0) return alert("Invalid number");
+
+  // Show loading indicator
+  const loading = document.createElement('div');
+  loading.style.position = 'fixed';
+  loading.style.top = '0';
+  loading.style.left = '0';
+  loading.style.width = '100%';
+  loading.style.height = '100%';
+  loading.style.backgroundColor = 'rgba(0,0,0,0.7)';
+  loading.style.color = 'white';
+  loading.style.display = 'flex';
+  loading.style.justifyContent = 'center';
+  loading.style.alignItems = 'center';
+  loading.style.zIndex = '1000';
+  loading.innerHTML = '<div style="font-size:24px">Generating QR codes...</div>';
+  document.body.appendChild(loading);
+
+  try {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({
+      unit: 'mm',
+      format: [100, 150], // 100mm x 150mm paper
+      hotfixes: ["px_scaling"] // Fix PDF scaling
+    });
+
+    // Page layout calculations
+    const qrSize = 16; // 20mm x 20mm QR codes
+    const cols = 4;    // 4 per row
+    const xMargin = (100 - (cols * qrSize)) / (cols + 1); // Equal left/right margins
+    const yMargin = 10; // Top margin
+    const ySpacing = 8; // Vertical space between QR rows
+    const textHeight = 5; // Space for serial text
+    const rowsPerPage = Math.floor((150 - yMargin - textHeight) / (qrSize + ySpacing));
+
+    let currentPage = 0;
+    let positionOnPage = 0;
+
+    for (let i = 0; i < count; i++) {
+      const serial = "ID" + (++lastSerialNum).toString().padStart(3, '0');
+      
+      // Calculate position
+      const row = Math.floor(positionOnPage / cols);
+      const col = positionOnPage % cols;
+      const x = xMargin + col * (qrSize + xMargin);
+      const y = yMargin + row * (qrSize + ySpacing);
+
+      // Generate QR code
+      const qrCanvas = document.createElement('canvas');
+      await new Promise(resolve => {
+        QRCode.toCanvas(qrCanvas, serial, {
+          width: qrSize * 5, // High resolution (5 pixels per mm)
+          margin: 0,
+          color: { dark: '#000000', light: '#ffffff00' }
+        }, resolve);
       });
 
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      link.setAttribute("download", "filtered_material_history.csv");
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      // Add to PDF
+      doc.addImage(qrCanvas, 'PNG', x, y, qrSize, qrSize);
+      
+      // Add serial text (centered below QR)
+      doc.setFontSize(14);
+      doc.text(serial, x + qrSize/2, y + qrSize + 5, { align: 'center' });
+
+      positionOnPage++;
+      
+      // New page if needed
+      if (positionOnPage >= cols * rowsPerPage && i < count - 1) {
+        doc.addPage([100, 150]);
+        positionOnPage = 0;
+        currentPage++;
+      }
     }
 
-    // Reset history
-    function resetHistory() {
-      if (confirm("Reset entire history and stock? This cannot be undone.")) {
-        db = {};
+    // Save and cleanup
+    localStorage.setItem('lastSerial', lastSerialNum);
+    document.body.removeChild(loading);
+    doc.save(`qr_codes_${new Date().toISOString().slice(0,10)}.pdf`);
+
+  } catch (error) {
+    document.body.removeChild(loading);
+    alert("Generation failed: " + error.message);
+    console.error(error);
+  }
+}
+    // Load from Firestore on app start
+    async function loadFromFirestore() {
+      db = {};
+      historyLog = [];
+
+      // Load materials collection
+      const materialsSnapshot = await dbFirebase.collection('materials').get();
+      materialsSnapshot.forEach(doc => {
+        db[doc.id] = doc.data().material;
+      });
+
+      // Load history collection ordered by date
+      const historySnapshot = await dbFirebase.collection('history').orderBy('date').get();
+      historySnapshot.forEach(doc => {
+        historyLog.push(doc.data());
+      });
+
+      saveDB();
+    }
+
+    // Listen realtime updates on materials collection
+    function listenMaterialsRealtime() {
+      dbFirebase.collection('materials').onSnapshot(snapshot => {
+        snapshot.docChanges().forEach(change => {
+          const serial = change.doc.id;
+          const data = change.doc.data();
+
+          if (change.type === "added" || change.type === "modified") {
+            db[serial] = data.material;
+          } else if (change.type === "removed") {
+            delete db[serial];
+          }
+        });
+        saveDB();
+      });
+    }
+
+    // Listen realtime updates on history collection
+    function listenHistoryRealtime() {
+      dbFirebase.collection('history').orderBy('date').onSnapshot(snapshot => {
         historyLog = [];
-        saveDB();
-        alert("History and stock reset.");
-      }
-    }
-
-    // Generate multiple QR codes PDF (auto increment ID)
-    function generateMultipleQRCodes() {
-      const count = parseInt(prompt("How many QR codes to generate?", "10"));
-      if (isNaN(count) || count <= 0) {
-        return alert("Invalid number.");
-      }
-
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF();
-      const cols = 3, rows = 5;
-      let xMargin = 10, yMargin = 10;
-      let boxSize = 50;
-      let perPage = cols * rows;
-      let current = 0;
-
-      for (let i = 0; i < count; i++) {
-        const serial = "ID" + (++lastSerialNum).toString().padStart(3, '0');
-        let col = i % cols;
-        let row = Math.floor((i % perPage) / cols);
-        let x = xMargin + col * (boxSize + 10);
-        let y = yMargin + row * (boxSize + 25);
-
-        // Draw border and serial text
-        doc.setDrawColor(0);
-        doc.rect(x, y, boxSize, boxSize);
-        doc.setFontSize(8);
-        doc.text(serial, x + boxSize / 2, y + boxSize + 7, { align: 'center' });
-
-        // Draw QR code canvas offscreen
-        const qrCanvas = document.createElement('canvas');
-        QRCode.toCanvas(qrCanvas, serial, { width: boxSize }, (error) => {
-          if (error) {
-            console.error(error);
-          } else {
-            const imgData = qrCanvas.toDataURL('image/png');
-            doc.addImage(imgData, 'PNG', x, y, boxSize, boxSize);
-          }
+        snapshot.forEach(doc => {
+          historyLog.push(doc.data());
         });
-
-        current++;
-        if (current % perPage === 0 && i < count - 1) {
-          doc.addPage();
-        }
-      }
-
-      localStorage.setItem('lastSerial', lastSerialNum);
-      doc.save("generated_qrcodes.pdf");
-    }
-
-    // Load database and history from localStorage & Firestore on start
-    async function loadDatabase() {
-      try {
-        // Load localStorage
-        const localDB = localStorage.getItem('materialDB');
-        const localHistory = localStorage.getItem('materialHistory');
-
-        if (localDB) {
-          db = JSON.parse(localDB);
-          // Normalize keys to uppercase
-          const normalized = {};
-          for (const key in db) {
-            normalized[key.toUpperCase()] = db[key];
-          }
-          db = normalized;
-        }
-
-        if (localHistory) {
-          historyLog = JSON.parse(localHistory);
-        }
-
-        renderList();
-
-        // Now sync with Firestore materials
-        const materialsSnapshot = await dbFirebase.collection('materials').get();
-        materialsSnapshot.forEach(doc => {
-          db[doc.id.toUpperCase()] = doc.data().material;
-        });
-        renderList();
-
-        // Optionally load history from Firestore (if you want)
-        // const historySnapshot = await dbFirebase.collection('history').get();
-        // historyLog = [];
-        // historySnapshot.forEach(doc => historyLog.push(doc.data()));
-
         saveDB();
-      } catch (e) {
-        alert("Error loading database: " + e.message);
-      }
+      });
     }
 
-    window.onload = loadDatabase;
+    // On window load: load localStorage first, then fetch Firestore data and start listening for realtime changes
+    window.onload = async () => {
+      // Load cache first for instant UI
+      const storedDB = localStorage.getItem('materialDB');
+      const storedHistory = localStorage.getItem('materialHistory');
+
+      if (storedDB) db = JSON.parse(storedDB);
+      if (storedHistory) historyLog = JSON.parse(storedHistory);
+      renderList();
+
+      // Then load from Firestore fresh and listen for updates
+      await loadFromFirestore();
+      listenMaterialsRealtime();
+      listenHistoryRealtime();
+    };
   </script>
 </body>
 

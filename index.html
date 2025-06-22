@@ -6,21 +6,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Guruvel Creativities Inventory</title>
 
-  <!-- Tailwind CSS CDN (dev only, see note below) -->
   <script src="https://cdn.tailwindcss.com"></script>
-
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js"></script>
 
-  <!-- Firebase App (compat) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-  <!-- Firebase Firestore (compat) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 </head>
 
 <body class="bg-gray-100 min-h-screen flex flex-col items-center p-6 font-sans">
-  <div class="max-w-3xl w-full bg-white rounded-lg shadow-lg p-6">
+  <div class="max-w-4xl w-full bg-white rounded-lg shadow-lg p-6">
     <div class="flex items-center mb-6 space-x-4">
       <img class="w-24"
         src="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgra2sfgJ1ZE0ub9g2_geCiFkRrdEhgzI_LQ7qkySYRO9ss4QHHWGTL-HlniFl5AuPq5uu7gtQKvrgyregnbofmhQau5V6kWzcwQcj7G-Wpl2tIXPIfEKOLUbX781JbJbNiQ04dK-Q1TzBS/s268/Screenshot+%25284%2529.png"
@@ -50,6 +46,8 @@
         <option value="Add">Add</option>
         <option value="Consume">Consume</option>
       </select>
+      <input type="text" id="searchBox" placeholder="Search material or ID..."
+        class="border border-gray-300 rounded px-3 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" oninput="renderList()" />
       <button class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded shadow transition"
         onclick="exportFilteredHistory()">📁 Export Filtered</button>
     </div>
@@ -60,371 +58,30 @@
 
     <div class="bg-gray-50 rounded p-4 shadow-inner">
       <h2 class="text-xl font-semibold text-gray-700 mb-3 border-b border-gray-300 pb-2">Current Stock</h2>
-      <div id="stockList" class="text-gray-800 text-lg min-h-[100px]">
+      <div id="stockList" class="text-gray-800 text-base grid grid-cols-1 sm:grid-cols-2 gap-2 min-h-[100px]">
         <i>No materials in stock.</i>
       </div>
     </div>
   </div>
 
   <script>
-    // Your Firebase config here
-    const firebaseConfig = {
-      apiKey: "AIzaSyBmXJZ6dm-SLzzIvz9P22kXI23MwdW3WC0",
-      authDomain: "material-tracker-49dac.firebaseapp.com",
-      projectId: "material-tracker-49dac",
-      storageBucket: "material-tracker-49dac.appspot.com",
-      messagingSenderId: "548291877330",
-      appId: "1:548291877330:web:94a5d62b40058ad480100b"
-    };
-
-    // Initialize Firebase
-    firebase.initializeApp(firebaseConfig);
-    const dbFirebase = firebase.firestore();
-
-    let db = {};            // {serial: material}
-    let historyLog = [];    // array of history entries
-    let html5QrCode;
-    let lastSerialNum = parseInt(localStorage.getItem('lastSerial') || '0');
-
-    // Save to localStorage for cache
-    function saveDB() {
-      localStorage.setItem('materialDB', JSON.stringify(db));
-      localStorage.setItem('materialHistory', JSON.stringify(historyLog));
-      renderList();
-    }
-
-    // Render current stock grouped by material
+    // Override renderList function to support search
     function renderList() {
+      const query = document.getElementById('searchBox')?.value.toLowerCase() || "";
       let stock = {};
       for (let serial in db) {
         let material = db[serial];
-        stock[material] = (stock[material] || 0) + 1;
-      }
-      let html = Object.entries(stock).map(([mat, count]) => `<div>${mat}: ${count}</div>`).join('');
-      document.getElementById('stockList').innerHTML = html || '<i>No materials in stock.</i>';
-    }
-
-    // Start scanning QR
-    function startScan(mode) {
-      const readerElement = document.getElementById("reader");
-      document.getElementById("backButton").style.display = "inline";
-      html5QrCode = new Html5Qrcode("reader");
-      Html5Qrcode.getCameras().then(devices => {
-        if (devices.length) {
-          const backCamera = devices.find(d => d.label.toLowerCase().includes("back")) || devices[0];
-          html5QrCode.start(
-            backCamera.id,
-            { fps: 10, qrbox: 250 },
-            qrCodeMessage => {
-              html5QrCode.stop();
-              handleScan(qrCodeMessage, mode);
-            }
-          ).catch(err => alert("Scan error: " + err));
+        const key = `${material} (${serial})`;
+        if (!query || material.toLowerCase().includes(query) || serial.toLowerCase().includes(query)) {
+          stock[key] = (stock[key] || 0) + 1;
         }
-      });
-    }
-
-    function stopScan() {
-      if (html5QrCode) {
-        html5QrCode.stop().then(() => {
-          document.getElementById("backButton").style.display = "none";
-          document.getElementById("reader").innerHTML = "";
-        });
       }
+      const entries = Object.entries(stock);
+      let html = entries.length
+        ? entries.map(([desc, count]) => `<div class='p-2 border rounded bg-white shadow-sm'>${desc}: <b>${count}</b></div>`).join('')
+        : '<i>No matching materials found.</i>';
+      document.getElementById('stockList').innerHTML = html;
     }
-
-    // Handle scanned QR codes: Add or Consume materials + update Firestore
-    async function handleScan(serial, mode) {
-      serial = serial.trim();
-
-      if (mode === 'add' && /^ID\d{3,}$/.test(serial)) {
-        let material = prompt("Enter or select material name:", "NodeMCU");
-        if (!material) {
-          return alert("Material name is required to add.");
-        }
-        material = material.trim();
-        if (db[serial]) return alert('Already added.');
-
-        db[serial] = material;
-        const now = new Date().toISOString();
-        const historyEntry = { date: now, type: 'Add', id: serial, material };
-        historyLog.push(historyEntry);
-        saveDB();
-
-        try {
-          await dbFirebase.collection('materials').doc(serial).set({
-            material,
-            addedAt: firebase.firestore.FieldValue.serverTimestamp()
-          });
-          await dbFirebase.collection('history').add(historyEntry);
-        } catch (e) {
-          alert("Firestore save error: " + e.message);
-        }
-
-        alert('Material added successfully.');
-        return;
-      }
-
-      if (mode === 'add') {
-        if (db[serial]) return alert('Already added.');
-
-        let material = prompt("Enter or select material name:", "NodeMCU");
-        if (material) {
-          material = material.trim();
-          db[serial] = material;
-          const now = new Date().toISOString();
-          const historyEntry = { date: now, type: 'Add', id: serial, material };
-          historyLog.push(historyEntry);
-          saveDB();
-
-          try {
-            await dbFirebase.collection('materials').doc(serial).set({
-              material,
-              addedAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            await dbFirebase.collection('history').add(historyEntry);
-          } catch (e) {
-            alert("Firestore save error: " + e.message);
-          }
-
-          alert('Material added successfully.');
-          return;
-        }
-        return alert("Invalid serial or material.");
-      }
-
-      if (mode === 'consume') {
-        if (!db[serial]) return alert('Material not found.');
-
-        const material = db[serial];
-        delete db[serial];
-        const now = new Date().toISOString();
-        const historyEntry = { date: now, type: 'Consume', id: serial, material };
-        historyLog.push(historyEntry);
-        saveDB();
-
-        try {
-          await dbFirebase.collection('materials').doc(serial).delete();
-          await dbFirebase.collection('history').add(historyEntry);
-        } catch (e) {
-          alert("Firestore save error: " + e.message);
-        }
-
-        alert(`Consumed material: ${material}`);
-        return;
-      }
-
-      alert("Unknown mode.");
-    }
-
-    // Export all history to Excel CSV
-    function exportHistoryToExcel() {
-      if (!historyLog.length) return alert("No history to export.");
-
-      const header = ['Date', 'Type', 'ID', 'Material'];
-      const rows = historyLog.map(h => [h.date, h.type, h.id, h.material]);
-      const csvContent = [header, ...rows].map(e => e.join(",")).join("\n");
-
-      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "material_history.csv";
-      link.click();
-
-      URL.revokeObjectURL(url);
-    }
-
-    // Reset history log
-    function resetHistory() {
-      if (!confirm("Clear entire history log?")) return;
-      historyLog = [];
-      saveDB();
-      alert("History log reset.");
-    }
-
-    // Filtering & exporting filtered data
-    function exportFilteredHistory() {
-      const filterDate = document.getElementById('filterDate').value;
-      const filterType = document.getElementById('filterType').value;
-
-      let filtered = historyLog;
-
-      if (filterDate) {
-        filtered = filtered.filter(e => e.date.startsWith(filterDate));
-      }
-      if (filterType) {
-        filtered = filtered.filter(e => e.type === filterType);
-      }
-      if (!filtered.length) return alert("No records match filter.");
-
-      const header = ['Date', 'Type', 'ID', 'Material'];
-      const rows = filtered.map(h => [h.date, h.type, h.id, h.material]);
-      const csvContent = [header, ...rows].map(e => e.join(",")).join("\n");
-
-      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "filtered_material_history.csv";
-      link.click();
-
-      URL.revokeObjectURL(url);
-    }
-
-async function generateMultipleQRCodes() {
-  // Get quantity from user
-  const count = parseInt(prompt("How many QR codes to generate?", "10"));
-  if (isNaN(count) || count <= 0) return alert("Invalid number");
-
-  // Show loading indicator
-  const loading = document.createElement('div');
-  loading.style.position = 'fixed';
-  loading.style.top = '0';
-  loading.style.left = '0';
-  loading.style.width = '100%';
-  loading.style.height = '100%';
-  loading.style.backgroundColor = 'rgba(0,0,0,0.7)';
-  loading.style.color = 'white';
-  loading.style.display = 'flex';
-  loading.style.justifyContent = 'center';
-  loading.style.alignItems = 'center';
-  loading.style.zIndex = '1000';
-  loading.innerHTML = '<div style="font-size:24px">Generating QR codes...</div>';
-  document.body.appendChild(loading);
-
-  try {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({
-      unit: 'mm',
-      format: [100, 150], // 100mm x 150mm paper
-      hotfixes: ["px_scaling"] // Fix PDF scaling
-    });
-
-    // Page layout calculations
-    const qrSize = 16; // 20mm x 20mm QR codes
-    const cols = 4;    // 4 per row
-    const xMargin = (100 - (cols * qrSize)) / (cols + 1); // Equal left/right margins
-    const yMargin = 10; // Top margin
-    const ySpacing = 8; // Vertical space between QR rows
-    const textHeight = 5; // Space for serial text
-    const rowsPerPage = Math.floor((150 - yMargin - textHeight) / (qrSize + ySpacing));
-
-    let currentPage = 0;
-    let positionOnPage = 0;
-
-    for (let i = 0; i < count; i++) {
-      const serial = "ID" + (++lastSerialNum).toString().padStart(3, '0');
-      
-      // Calculate position
-      const row = Math.floor(positionOnPage / cols);
-      const col = positionOnPage % cols;
-      const x = xMargin + col * (qrSize + xMargin);
-      const y = yMargin + row * (qrSize + ySpacing);
-
-      // Generate QR code
-      const qrCanvas = document.createElement('canvas');
-      await new Promise(resolve => {
-        QRCode.toCanvas(qrCanvas, serial, {
-          width: qrSize * 5, // High resolution (5 pixels per mm)
-          margin: 0,
-          color: { dark: '#000000', light: '#ffffff00' }
-        }, resolve);
-      });
-
-      // Add to PDF
-      doc.addImage(qrCanvas, 'PNG', x, y, qrSize, qrSize);
-      
-      // Add serial text (centered below QR)
-      doc.setFontSize(14);
-      doc.text(serial, x + qrSize/2, y + qrSize + 5, { align: 'center' });
-
-      positionOnPage++;
-      
-      // New page if needed
-      if (positionOnPage >= cols * rowsPerPage && i < count - 1) {
-        doc.addPage([100, 150]);
-        positionOnPage = 0;
-        currentPage++;
-      }
-    }
-
-    // Save and cleanup
-    localStorage.setItem('lastSerial', lastSerialNum);
-    document.body.removeChild(loading);
-    doc.save(`qr_codes_${new Date().toISOString().slice(0,10)}.pdf`);
-
-  } catch (error) {
-    document.body.removeChild(loading);
-    alert("Generation failed: " + error.message);
-    console.error(error);
-  }
-}
-    // Load from Firestore on app start
-    async function loadFromFirestore() {
-      db = {};
-      historyLog = [];
-
-      // Load materials collection
-      const materialsSnapshot = await dbFirebase.collection('materials').get();
-      materialsSnapshot.forEach(doc => {
-        db[doc.id] = doc.data().material;
-      });
-
-      // Load history collection ordered by date
-      const historySnapshot = await dbFirebase.collection('history').orderBy('date').get();
-      historySnapshot.forEach(doc => {
-        historyLog.push(doc.data());
-      });
-
-      saveDB();
-    }
-
-    // Listen realtime updates on materials collection
-    function listenMaterialsRealtime() {
-      dbFirebase.collection('materials').onSnapshot(snapshot => {
-        snapshot.docChanges().forEach(change => {
-          const serial = change.doc.id;
-          const data = change.doc.data();
-
-          if (change.type === "added" || change.type === "modified") {
-            db[serial] = data.material;
-          } else if (change.type === "removed") {
-            delete db[serial];
-          }
-        });
-        saveDB();
-      });
-    }
-
-    // Listen realtime updates on history collection
-    function listenHistoryRealtime() {
-      dbFirebase.collection('history').orderBy('date').onSnapshot(snapshot => {
-        historyLog = [];
-        snapshot.forEach(doc => {
-          historyLog.push(doc.data());
-        });
-        saveDB();
-      });
-    }
-
-    // On window load: load localStorage first, then fetch Firestore data and start listening for realtime changes
-    window.onload = async () => {
-      // Load cache first for instant UI
-      const storedDB = localStorage.getItem('materialDB');
-      const storedHistory = localStorage.getItem('materialHistory');
-
-      if (storedDB) db = JSON.parse(storedDB);
-      if (storedHistory) historyLog = JSON.parse(storedHistory);
-      renderList();
-
-      // Then load from Firestore fresh and listen for updates
-      await loadFromFirestore();
-      listenMaterialsRealtime();
-      listenHistoryRealtime();
-    };
   </script>
 </body>
 

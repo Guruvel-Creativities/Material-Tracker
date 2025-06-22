@@ -65,7 +65,10 @@
   </div>
 
   <script>
-    // Override renderList function to support search
+let db = {};            // stock: {serial: material}
+let historyLog = [];    // history array
+let html5QrCode;
+let lastSerialNum = parseInt(localStorage.getItem('lastSerial') || '0');
     function renderList() {
       const query = document.getElementById('searchBox')?.value.toLowerCase() || "";
       let stock = {};

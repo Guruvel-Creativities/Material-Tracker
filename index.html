@@ -73,26 +73,29 @@
     firebase.initializeApp(firebaseConfig);
     const dbFirebase = firebase.firestore();
 
-    // ✅ Renders current stock and applies search filter
-    function renderList() {
-      const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-      let stock = {};
+   function renderList() {
+  const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+  let stock = {};
 
-      for (let serial in db) {
-        let material = db[serial];
-        if (material.toLowerCase().includes(searchTerm)) {
-          stock[material] = (stock[material] || 0) + 1;
-        }
-      }
-
-      let html = Object.entries(stock).map(([mat, count]) =>
-        `<div class="border-b py-1 flex justify-between">
-          <span>${mat}</span><span class="font-semibold">${count}</span>
-        </div>`
-      ).join('');
-
-      document.getElementById('stockList').innerHTML = html || '<i>No materials match search.</i>';
+  for (let serial in db) {
+    let material = db[serial];
+    if (material.toLowerCase().includes(searchTerm)) {
+      stock[material] = (stock[material] || 0) + 1;
     }
+  }
+
+  const entries = Object.entries(stock);
+  let html = entries.map(([mat, count], index) =>
+    `<div class="border-b py-1 flex justify-between">
+      <span class="text-gray-600">${index + 1}.</span>
+      <span class="flex-1 ml-2">${mat}</span>
+      <span class="font-semibold">${count}</span>
+    </div>`
+  ).join('');
+
+  document.getElementById('stockList').innerHTML = html || '<i>No materials match search.</i>';
+}
+
 
     // ✅ Wrapper to avoid crash if db is not yet loaded
     function safeRenderList() {

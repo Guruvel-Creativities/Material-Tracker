@@ -136,6 +136,78 @@
         renderList();
       });
     }
+function startScan(mode) {
+  document.getElementById("reader").innerHTML = ""; // clear previous scanner UI
+  document.getElementById("backButton").classList.remove("hidden");
+
+  html5QrCode = new Html5Qrcode("reader");
+
+  const config = { fps: 10, qrbox: 250 };
+
+  html5QrCode.start(
+    { facingMode: "environment" },
+    config,
+    async (decodedText, decodedResult) => {
+      await html5QrCode.stop();
+      document.getElementById("backButton").classList.add("hidden");
+      document.getElementById("reader").innerHTML = "";
+
+      handleScannedCode(decodedText, mode);
+    },
+    (errorMessage) => {
+      // console.warn(`QR error: ${errorMessage}`);
+    }
+  ).catch((err) => {
+    console.error("Unable to start scan:", err);
+    alert("Camera access failed. Please allow permission and try again.");
+  });
+}
+
+function stopScan() {
+  if (html5QrCode) {
+    html5QrCode.stop().then(() => {
+      document.getElementById("reader").innerHTML = "";
+      document.getElementById("backButton").classList.add("hidden");
+    }).catch((err) => {
+      console.error("Stop scan error:", err);
+    });
+  }
+}
+
+// Example handler function (you can customize this as per your logic)
+function handleScannedCode(scannedText, mode) {
+  if (!scannedText) return;
+  const serial = scannedText.trim();
+  const timestamp = new Date();
+
+  if (mode === "add") {
+    const materialName = prompt("Enter material name for this serial:");
+    if (!materialName) return;
+
+    dbFirebase.collection("materials").doc(serial).set({ material: materialName });
+    dbFirebase.collection("history").add({
+      serial,
+      material: materialName,
+      type: "Add",
+      date: timestamp
+    });
+    alert(`Material added: ${materialName}`);
+  } else if (mode === "consume") {
+    if (db[serial]) {
+      const materialName = db[serial];
+      dbFirebase.collection("materials").doc(serial).delete();
+      dbFirebase.collection("history").add({
+        serial,
+        material: materialName,
+        type: "Consume",
+        date: timestamp
+      });
+      alert(`Material consumed: ${materialName}`);
+    } else {
+      alert("Material not found in inventory.");
+    }
+  }
+}
 
     // ✅ On load
     window.onload = async () => {

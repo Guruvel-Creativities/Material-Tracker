@@ -177,13 +177,23 @@
         if (!materialName) return;
 
         dbFirebase.collection("materials").doc(serial).set({ material: materialName });
-        dbFirebase.collection("history").add({ serial, material: materialName, type: "Add", date: timestamp });
+        dbFirebase.collection("history").add({
+          serial: serial,
+          material: materialName,
+          type: "Add",
+          date: timestamp
+        });
         alert(`Material added: ${materialName}`);
       } else if (mode === "consume") {
         if (db[serial]) {
           const materialName = db[serial];
           dbFirebase.collection("materials").doc(serial).delete();
-          dbFirebase.collection("history").add({ serial, material: materialName, type: "Consume", date: timestamp });
+          dbFirebase.collection("history").add({
+            serial: serial,
+            material: materialName,
+            type: "Consume",
+            date: timestamp
+          });
           alert(`Material consumed: ${materialName}`);
         } else {
           alert("Material not found in inventory.");
@@ -192,17 +202,22 @@
     }
 
     function exportHistoryToExcel() {
-      const worksheetData = historyLog.map(entry => ({
-        Date: new Date(entry.date.seconds * 1000).toLocaleString(),
-        Type: entry.type,
-        Material: entry.material,
-        Serial: entry.serial,
-      }));
+      const worksheetData = historyLog.map(entry => {
+        const dateObj = entry.date?.seconds
+          ? new Date(entry.date.seconds * 1000)
+          : new Date(entry.date);
+
+        return {
+          Date: isNaN(dateObj) ? "Unknown" : dateObj.toLocaleString(),
+          Type: entry.type || "N/A",
+          Material: entry.material || "N/A",
+          Serial: entry.serial || "N/A"
+        };
+      });
 
       const worksheet = XLSX.utils.json_to_sheet(worksheetData);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "History");
-
       XLSX.writeFile(workbook, "Inventory_History.xlsx");
     }
 
@@ -211,22 +226,30 @@
       const filterType = document.getElementById('filterType').value;
 
       const filtered = historyLog.filter(entry => {
-        const entryDate = new Date(entry.date.seconds * 1000).toISOString().split('T')[0];
-        return (!filterDate || filterDate === entryDate) &&
+        const rawDate = entry.date?.seconds
+          ? new Date(entry.date.seconds * 1000)
+          : new Date(entry.date);
+        const entryDateStr = isNaN(rawDate) ? "" : rawDate.toISOString().split('T')[0];
+        return (!filterDate || filterDate === entryDateStr) &&
                (!filterType || entry.type === filterType);
       });
 
-      const worksheetData = filtered.map(entry => ({
-        Date: new Date(entry.date.seconds * 1000).toLocaleString(),
-        Type: entry.type,
-        Material: entry.material,
-        Serial: entry.serial,
-      }));
+      const worksheetData = filtered.map(entry => {
+        const dateObj = entry.date?.seconds
+          ? new Date(entry.date.seconds * 1000)
+          : new Date(entry.date);
+
+        return {
+          Date: isNaN(dateObj) ? "Unknown" : dateObj.toLocaleString(),
+          Type: entry.type || "N/A",
+          Material: entry.material || "N/A",
+          Serial: entry.serial || "N/A"
+        };
+      });
 
       const worksheet = XLSX.utils.json_to_sheet(worksheetData);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Filtered History");
-
       XLSX.writeFile(workbook, "Filtered_Inventory_History.xlsx");
     }
 
@@ -244,7 +267,7 @@
     }
 
     function generateMultipleQRCodes() {
-      alert("QR Code generation not implemented yet. Can be added if needed.");
+      alert("QR Code generation not implemented yet.");
     }
 
     window.onload = async () => {

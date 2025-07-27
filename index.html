@@ -5,10 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Guruvel Creativities Inventory</title>
 
+  <!-- Required Libraries -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 </head>
@@ -54,13 +56,10 @@
   </div>
 
   <script>
-    // ✅ Declare globals first
-    let db = {};            // Stock items by serial
-    let historyLog = [];    // History entries
+    let db = {};
+    let historyLog = [];
     let html5QrCode;
-    let lastSerialNum = parseInt(localStorage.getItem('lastSerial') || '0');
 
-    // ✅ Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyBmXJZ6dm-SLzzIvz9P22kXI23MwdW3WC0",
       authDomain: "material-tracker-49dac.firebaseapp.com",
@@ -73,36 +72,30 @@
     firebase.initializeApp(firebaseConfig);
     const dbFirebase = firebase.firestore();
 
-   function renderList() {
-  const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-  let stock = {};
-
-  for (let serial in db) {
-    let material = db[serial];
-    if (material.toLowerCase().includes(searchTerm)) {
-      stock[material] = (stock[material] || 0) + 1;
+    function renderList() {
+      const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+      let stock = {};
+      for (let serial in db) {
+        let material = db[serial];
+        if (material.toLowerCase().includes(searchTerm)) {
+          stock[material] = (stock[material] || 0) + 1;
+        }
+      }
+      const entries = Object.entries(stock);
+      let html = entries.map(([mat, count], index) =>
+        `<div class="border-b py-1 flex justify-between">
+          <span class="text-gray-600">${index + 1}.</span>
+          <span class="flex-1 ml-2">${mat}</span>
+          <span class="font-semibold">${count}</span>
+        </div>`
+      ).join('');
+      document.getElementById('stockList').innerHTML = html || '<i>No materials match search.</i>';
     }
-  }
 
-  const entries = Object.entries(stock);
-  let html = entries.map(([mat, count], index) =>
-    `<div class="border-b py-1 flex justify-between">
-      <span class="text-gray-600">${index + 1}.</span>
-      <span class="flex-1 ml-2">${mat}</span>
-      <span class="font-semibold">${count}</span>
-    </div>`
-  ).join('');
-
-  document.getElementById('stockList').innerHTML = html || '<i>No materials match search.</i>';
-}
-
-
-    // ✅ Wrapper to avoid crash if db is not yet loaded
     function safeRenderList() {
       if (typeof db !== 'undefined') renderList();
     }
 
-    // ✅ Load Firestore data on start
     async function loadFromFirestore() {
       db = {};
       historyLog = [];
@@ -120,13 +113,11 @@
       renderList();
     }
 
-    // ✅ Real-time updates
     function listenMaterialsRealtime() {
       dbFirebase.collection('materials').onSnapshot(snapshot => {
         snapshot.docChanges().forEach(change => {
           const serial = change.doc.id;
           const data = change.doc.data();
-
           if (change.type === "added" || change.type === "modified") {
             db[serial] = data.material;
           } else if (change.type === "removed") {
@@ -136,80 +127,126 @@
         renderList();
       });
     }
-function startScan(mode) {
-  document.getElementById("reader").innerHTML = ""; // clear previous scanner UI
-  document.getElementById("backButton").classList.remove("hidden");
 
-  html5QrCode = new Html5Qrcode("reader");
-
-  const config = { fps: 10, qrbox: 250 };
-
-  html5QrCode.start(
-    { facingMode: "environment" },
-    config,
-    async (decodedText, decodedResult) => {
-      await html5QrCode.stop();
-      document.getElementById("backButton").classList.add("hidden");
+    function startScan(mode) {
       document.getElementById("reader").innerHTML = "";
+      document.getElementById("backButton").classList.remove("hidden");
 
-      handleScannedCode(decodedText, mode);
-    },
-    (errorMessage) => {
-      // console.warn(`QR error: ${errorMessage}`);
-    }
-  ).catch((err) => {
-    console.error("Unable to start scan:", err);
-    alert("Camera access failed. Please allow permission and try again.");
-  });
-}
+      html5QrCode = new Html5Qrcode("reader");
+      const config = { fps: 10, qrbox: 250 };
 
-function stopScan() {
-  if (html5QrCode) {
-    html5QrCode.stop().then(() => {
-      document.getElementById("reader").innerHTML = "";
-      document.getElementById("backButton").classList.add("hidden");
-    }).catch((err) => {
-      console.error("Stop scan error:", err);
-    });
-  }
-}
-
-// Example handler function (you can customize this as per your logic)
-function handleScannedCode(scannedText, mode) {
-  if (!scannedText) return;
-  const serial = scannedText.trim();
-  const timestamp = new Date();
-
-  if (mode === "add") {
-    const materialName = prompt("Enter material name for this serial:");
-    if (!materialName) return;
-
-    dbFirebase.collection("materials").doc(serial).set({ material: materialName });
-    dbFirebase.collection("history").add({
-      serial,
-      material: materialName,
-      type: "Add",
-      date: timestamp
-    });
-    alert(`Material added: ${materialName}`);
-  } else if (mode === "consume") {
-    if (db[serial]) {
-      const materialName = db[serial];
-      dbFirebase.collection("materials").doc(serial).delete();
-      dbFirebase.collection("history").add({
-        serial,
-        material: materialName,
-        type: "Consume",
-        date: timestamp
+      html5QrCode.start(
+        { facingMode: "environment" },
+        config,
+        async (decodedText) => {
+          await html5QrCode.stop();
+          document.getElementById("backButton").classList.add("hidden");
+          document.getElementById("reader").innerHTML = "";
+          handleScannedCode(decodedText, mode);
+        },
+        (errorMessage) => { }
+      ).catch((err) => {
+        console.error("Unable to start scan:", err);
+        alert("Camera access failed. Please allow permission and try again.");
       });
-      alert(`Material consumed: ${materialName}`);
-    } else {
-      alert("Material not found in inventory.");
     }
-  }
-}
 
-    // ✅ On load
+    function stopScan() {
+      if (html5QrCode) {
+        html5QrCode.stop().then(() => {
+          document.getElementById("reader").innerHTML = "";
+          document.getElementById("backButton").classList.add("hidden");
+        }).catch((err) => {
+          console.error("Stop scan error:", err);
+        });
+      }
+    }
+
+    function handleScannedCode(scannedText, mode) {
+      if (!scannedText) return;
+      const serial = scannedText.trim();
+      const timestamp = new Date();
+
+      if (mode === "add") {
+        if (db[serial]) {
+          alert("This material already exists in inventory.");
+          return;
+        }
+
+        const materialName = prompt("Enter material name for this serial:");
+        if (!materialName) return;
+
+        dbFirebase.collection("materials").doc(serial).set({ material: materialName });
+        dbFirebase.collection("history").add({ serial, material: materialName, type: "Add", date: timestamp });
+        alert(`Material added: ${materialName}`);
+      } else if (mode === "consume") {
+        if (db[serial]) {
+          const materialName = db[serial];
+          dbFirebase.collection("materials").doc(serial).delete();
+          dbFirebase.collection("history").add({ serial, material: materialName, type: "Consume", date: timestamp });
+          alert(`Material consumed: ${materialName}`);
+        } else {
+          alert("Material not found in inventory.");
+        }
+      }
+    }
+
+    function exportHistoryToExcel() {
+      const worksheetData = historyLog.map(entry => ({
+        Date: new Date(entry.date.seconds * 1000).toLocaleString(),
+        Type: entry.type,
+        Material: entry.material,
+        Serial: entry.serial,
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "History");
+
+      XLSX.writeFile(workbook, "Inventory_History.xlsx");
+    }
+
+    function exportFilteredHistory() {
+      const filterDate = document.getElementById('filterDate').value;
+      const filterType = document.getElementById('filterType').value;
+
+      const filtered = historyLog.filter(entry => {
+        const entryDate = new Date(entry.date.seconds * 1000).toISOString().split('T')[0];
+        return (!filterDate || filterDate === entryDate) &&
+               (!filterType || entry.type === filterType);
+      });
+
+      const worksheetData = filtered.map(entry => ({
+        Date: new Date(entry.date.seconds * 1000).toLocaleString(),
+        Type: entry.type,
+        Material: entry.material,
+        Serial: entry.serial,
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Filtered History");
+
+      XLSX.writeFile(workbook, "Filtered_Inventory_History.xlsx");
+    }
+
+    function resetHistory() {
+      if (confirm("Are you sure you want to delete all history records?")) {
+        dbFirebase.collection("history").get().then(snapshot => {
+          const batch = dbFirebase.batch();
+          snapshot.forEach(doc => batch.delete(doc.ref));
+          return batch.commit().then(() => {
+            alert("History cleared.");
+            loadFromFirestore();
+          });
+        });
+      }
+    }
+
+    function generateMultipleQRCodes() {
+      alert("QR Code generation not implemented yet. Can be added if needed.");
+    }
+
     window.onload = async () => {
       await loadFromFirestore();
       listenMaterialsRealtime();

@@ -211,7 +211,7 @@
       });
       const wb = XLSX.utils.book_new();
       const ws = XLSX.utils.aoa_to_sheet(wsData);
-      XLSX.utils.book_append_sheet(wb, ws, "History");
+      XLSX.utils.book_append_sheet(wb, ws, "Material_History");
       XLSX.writeFile(wb, "inventory_history.xlsx");
     }
 

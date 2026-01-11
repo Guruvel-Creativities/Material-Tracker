@@ -369,12 +369,18 @@ function exportCSV() {
 }
 
 /* GENERATE QR PDF */
+/* GENERATE QR PDF - UPDATED TO START FROM 941 */
 async function generateQR() {
     const count = parseInt(prompt("How many QR codes to generate?"));
     if (!count || count < 1) return;
     
     const settingsDoc = await db.collection("settings").doc("qr").get();
     let last = settingsDoc.exists ? (settingsDoc.data().lastNumber || 940) : 940;
+    
+    // START FROM 941 (since 940 is the last used, next should be 941)
+    if (last <= 940) last = 940; // Force start from 941 by setting last to 940
+    
+    // Verify we're starting from 941
     if (last < 940) last = 940;
     
     const { jsPDF } = window.jspdf;
@@ -388,8 +394,10 @@ async function generateQR() {
     let x = marginX, y = marginY, col = 0;
     
     for (let i = 1; i <= count; i++) {
+        // Increment last number and generate ID
         const id = "ID" + String(++last).padStart(3, "0");
         
+        // Create QR code canvas
         const canvas = document.createElement("canvas");
         await QRCode.toCanvas(canvas, id, {
             width: qrSize * 4,
@@ -397,10 +405,12 @@ async function generateQR() {
             color: { dark: "#000000", light: "#FFFFFF" }
         });
         
+        // Add QR code and text to PDF
         pdf.addImage(canvas, "PNG", x, y, qrSize, qrSize);
         pdf.setFontSize(fontSize);
         pdf.text(id, x + qrSize/2, y + qrSize + textGap, { align: "center" });
         
+        // Move to next position
         col++;
         if (col < qrPerRow) {
             x += qrSize + spacingX;
@@ -409,6 +419,7 @@ async function generateQR() {
             x = marginX;
             y += qrSize + textGap + spacingY;
             
+            // Add new page if needed
             if (y + qrSize + textGap > 150 - marginY) {
                 pdf.addPage([100, 150]);
                 y = marginY;
@@ -416,12 +427,19 @@ async function generateQR() {
         }
     }
     
-    pdf.save(`QR_Codes_ID${String(last-count+1).padStart(3,'0')}_to_ID${String(last).padStart(3,'0')}.pdf`);
+    // Generate filename with proper range
+    const startID = last - count + 1;
+    const filename = `QR_Codes_ID${String(startID).padStart(3,'0')}_to_ID${String(last).padStart(3,'0')}.pdf`;
+    
+    // Save PDF
+    pdf.save(filename);
+    
+    // Save last used number to Firestore
     await db.collection("settings").doc("qr").set({ lastNumber: last });
     
-    alert(`Generated ${count} QR codes\nFrom: ID${String(last-count+1).padStart(3,'0')}\nTo: ID${String(last).padStart(3,'0')}`);
+    // Show success message
+    alert(`Generated ${count} QR codes\nFrom: ID${String(startID).padStart(3,'0')}\nTo: ID${String(last).padStart(3,'0')}`);
 }
-
 /* CLEANUP */
 window.addEventListener('beforeunload', stopScanner);
 window.addEventListener('pagehide', stopScanner);
@@ -432,4 +450,5 @@ renderStock();
 </script>
 </body>
 </html>
+
 

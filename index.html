@@ -33,7 +33,7 @@
 
 <!-- HEADER -->
 <div class="flex items-center gap-4 mb-4">
-<img class="w-20" src="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgra2sfgJ1ZE0ub9g2_geCiFkRrdEhgzI_LQ7qkySYRO9ss4QHHWGTL-HlniFl5AuPq5uu7gtQKvrgyregnbofmhQau5V6kWzcwQcj7G-Wpl2tIXPIfEKOLUbX781JbJbNiQ04dQ1TzBS/s268/Screenshot%20(4).png">
+<img class="w-20" src="https://raw.githubusercontent.com/Guruvel-Creativities/Material-Tracker/main/Logo.PNG" alt="Guruvel Creativities Logo">
 <h1 class="text-2xl font-bold">Guruvel Creativities Inventory</h1>
 </div>
 
@@ -128,7 +128,7 @@ function renderStock(){
  <span>${i+1}. ${m}</span><b>${n}</b></div>`).join("") || "<i>No match</i>";
 }
 
-/* CAMERA SCAN - FIXED FLOW */
+/* CAMERA SCAN */
 async function startScan(mode){
     if (isProcessingScan) {
         console.log("Already processing a scan, please wait...");
@@ -208,7 +208,7 @@ async function startScan(mode){
     }
 }
 
-/* PROCESS SCANNED CODE - IMPROVED */
+/* PROCESS SCANNED CODE - SIMPLIFIED (NO CONFIRMATION PROMPTS) */
 async function processScannedCode(serial, mode) {
     if (isProcessingScan) return;
     isProcessingScan = true;
@@ -217,7 +217,7 @@ async function processScannedCode(serial, mode) {
     
     // Validate QR format
     if(!serial.startsWith("ID")) {
-        alert("❌ Invalid QR code format\n\nExpected: ID###\nScanned: " + serial);
+        alert("Invalid QR code format. Expected: ID###\nScanned: " + serial);
         isProcessingScan = false;
         return;
     }
@@ -227,13 +227,13 @@ async function processScannedCode(serial, mode) {
     if(mode === "add"){
         // Check if already exists
         if(stock[serial]) {
-            alert(`⚠️ Already Exists!\n\nSerial: ${serial}\nMaterial: ${stock[serial]}\n\nThis item is already in stock.`);
+            alert(`Already exists!\n\nSerial: ${serial}\nMaterial: ${stock[serial]}\n\nThis item is already in stock.`);
             isProcessingScan = false;
             return;
         }
         
         // Get material name with the serial displayed
-        let materialName = prompt(`📝 Enter Material Name for:\n\nSerial: ${serial}\n\nMaterial Name:`);
+        let materialName = prompt(`Enter Material Name for: ${serial}\n\nMaterial Name:`);
         
         if(!materialName || materialName.trim() === "") {
             isProcessingScan = false;
@@ -242,61 +242,55 @@ async function processScannedCode(serial, mode) {
         
         materialName = materialName.trim();
         
-        // Confirm before adding
-        if(confirm(`✅ Confirm Add:\n\nSerial: ${serial}\nMaterial: ${materialName}\n\nAdd to inventory?`)) {
-            try {
-                // Save to database
-                await db.collection("materials").doc(serial).set({material: materialName});
-                await db.collection("history").add({
-                    serial: serial,
-                    material: materialName,
-                    type: "Add",
-                    date: new Date(),
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                
-                // Show success message
-                alert(`✅ Successfully Added!\n\nSerial: ${serial}\nMaterial: ${materialName}\n\nAdded to inventory.`);
-                
-                // Update stock display
-                renderStock();
-                
-            } catch (error) {
-                alert("❌ Error saving to database: " + error.message);
-            }
+        try {
+            // Save to database
+            await db.collection("materials").doc(serial).set({material: materialName});
+            await db.collection("history").add({
+                serial: serial,
+                material: materialName,
+                type: "Add",
+                date: new Date(),
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            
+            // Show success message
+            alert(`Added: ${materialName}\nSerial: ${serial}\n\nSuccessfully added to inventory.`);
+            
+            // Update stock display
+            renderStock();
+            
+        } catch (error) {
+            alert("Error saving to database: " + error.message);
         }
     }
     
     if(mode === "consume"){
         // Check if exists
         if(!stock[serial]) {
-            alert(`❌ Not Found in Stock!\n\nSerial: ${serial}\n\nThis item is not in the inventory.`);
+            alert(`Not found in stock!\n\nSerial: ${serial}\n\nThis item is not in the inventory.`);
             isProcessingScan = false;
             return;
         }
         
         let materialName = stock[serial];
         
-        // Confirm consumption
-        if(confirm(`🗑️ Confirm Consumption:\n\nSerial: ${serial}\nMaterial: ${materialName}\n\nRemove from inventory?`)) {
-            try {
-                await db.collection("materials").doc(serial).delete();
-                await db.collection("history").add({
-                    serial: serial,
-                    material: materialName,
-                    type: "Consume",
-                    date: new Date(),
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                
-                alert(`✅ Successfully Consumed!\n\nSerial: ${serial}\nMaterial: ${materialName}\n\nRemoved from inventory.`);
-                
-                // Update stock display
-                renderStock();
-                
-            } catch (error) {
-                alert("❌ Error updating database: " + error.message);
-            }
+        try {
+            await db.collection("materials").doc(serial).delete();
+            await db.collection("history").add({
+                serial: serial,
+                material: materialName,
+                type: "Consume",
+                date: new Date(),
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            
+            alert(`Consumed: ${materialName}\nSerial: ${serial}\n\nRemoved from inventory.`);
+            
+            // Update stock display
+            renderStock();
+            
+        } catch (error) {
+            alert("Error updating database: " + error.message);
         }
     }
     
@@ -413,7 +407,7 @@ async function generateQR(){
 
   await db.collection("settings").doc("qr").set({lastNumber:last});
   
-  alert(`✅ Generated ${n} QR codes\nFrom: ID${String(last-n+1).padStart(3,'0')}\nTo: ID${String(last).padStart(3,'0')}`);
+  alert(`Generated ${n} QR codes\nFrom: ID${String(last-n+1).padStart(3,'0')}\nTo: ID${String(last).padStart(3,'0')}`);
 }
 
 // Cleanup on page unload

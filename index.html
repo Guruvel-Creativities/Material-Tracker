@@ -146,7 +146,7 @@ function exportCSV(){
  XLSX.writeFile(wb,"Inventory_History.csv");
 }
 
-/* GENERATE QR PDF (150mm×100mm) - 5x5 grid (25 per page) */
+/* GENERATE QR PDF (150mm×100mm) - 4 QR per row × 6 rows = 24 per page */
 async function generateQR(){
  const n=parseInt(prompt("Number of QR codes?")); if(!n) return;
  let last=0;
@@ -157,41 +157,47 @@ async function generateQR(){
  const pdf=new jsPDF({unit:"mm",format:[100,150]});
  
  let page=1;
- let x=5; // Start 5mm from left
- let y=5; // Start 5mm from top
+ // Calculate starting position to center the grid
  const qrSize=15; // QR size 15mm
- const spacingX=18; // Horizontal spacing (including QR + space)
- const spacingY=18; // Vertical spacing (including QR + space)
- const qrPerPage=25; // 5 rows × 5 columns
- const qrPerRow=5;
+ const qrPerRow=4;
+ const qrPerColumn=6;
+ const horizontalSpacing=20; // 15mm QR + 5mm spacing
+ const verticalSpacing=22; // 15mm QR + 2mm text + 5mm spacing
+ const totalWidth=qrPerRow*horizontalSpacing;
+ const startX=(100-totalWidth)/2+5; // Center the grid horizontally
+ const startY=10; // Start 10mm from top
+ 
+ let x=startX;
+ let y=startY;
+ const qrPerPage=qrPerRow*qrPerColumn; // 4×6=24
  
  for(let i=1;i<=n;i++){
    const id="ID"+String(++last).padStart(3,"0");
    const c=document.createElement("canvas");
-   await QRCode.toCanvas(c,id,{width:120});
+   await QRCode.toCanvas(c,id,{width:150}); // Increased canvas size for better quality
    
-   // Add QR code
+   // Add QR code (15mm × 15mm)
    pdf.addImage(c,"PNG",x,y,qrSize,qrSize);
    
    // Add ID text below QR (smaller text)
    pdf.setFontSize(6);
-   pdf.text(id,x+(qrSize/2),y+qrSize+2,{align:"center"});
+   pdf.text(id,x+(qrSize/2),y+qrSize+2.5,{align:"center"});
    
    // Move to next column
-   x+=spacingX;
+   x+=horizontalSpacing;
    
    // Check if we need to move to next row
    if(i%qrPerRow===0){
-     x=5;
-     y+=spacingY;
+     x=startX;
+     y+=verticalSpacing;
    }
    
    // Check if we need a new page
    if(i%qrPerPage===0 && i<n){
      pdf.addPage([100,150]); // Add new page with same dimensions
      page++;
-     x=5;
-     y=5;
+     x=startX;
+     y=startY;
    }
  }
  

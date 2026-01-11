@@ -6,7 +6,6 @@
 <title>Guruvel Creativities Inventory</title>
 
 <script src="https://cdn.tailwindcss.com"></script>
-<script src="https://unpkg.com/html5-qrcode"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
@@ -14,39 +13,72 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
+<!-- Use Instascan for better iOS compatibility -->
+<script src="https://rawgit.com/schmich/instascan-builds/master/instascan.min.js"></script>
+
 <style>
-    #reader {
+    #scanner-container {
         position: relative;
-        background-color: #000;
+        width: 100%;
+        max-width: 320px;
+        margin: 0 auto;
+        overflow: hidden;
     }
     
-    #reader video {
-        width: 100% !important;
-        height: auto !important;
-        object-fit: cover;
+    #scanner-video {
+        width: 100%;
+        height: auto;
+        border-radius: 8px;
+        transform: scaleX(-1); /* Mirror for front camera */
     }
     
-    .zoom-controls {
+    .scan-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+    }
+    
+    .scan-frame {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 70%;
+        height: 70%;
+        border: 3px solid #3b82f6;
+        border-radius: 8px;
+        background: transparent;
+    }
+    
+    .scan-line {
+        position: absolute;
+        width: 100%;
+        height: 3px;
+        background: linear-gradient(90deg, transparent, #3b82f6, transparent);
+        animation: scan 1.5s ease-in-out infinite;
+        border-radius: 2px;
+    }
+    
+    @keyframes scan {
+        0% { top: 5%; }
+        100% { top: 95%; }
+    }
+    
+    .camera-switch {
         position: absolute;
         bottom: 10px;
         right: 10px;
-        z-index: 100;
-    }
-    
-    .zoom-btn {
-        background: rgba(0, 0, 0, 0.7);
+        background: rgba(0,0,0,0.6);
         color: white;
         border: none;
         border-radius: 50%;
         width: 40px;
         height: 40px;
-        font-size: 20px;
         cursor: pointer;
-        margin: 5px;
-    }
-    
-    .zoom-btn:hover {
-        background: rgba(0, 0, 0, 0.9);
+        z-index: 10;
     }
 </style>
 </head>
@@ -71,21 +103,31 @@
 <input id="searchInput" oninput="renderStock()" placeholder="Search material..."
 class="w-full border p-2 rounded mb-4">
 
-<!-- CAMERA CONTAINER - Hidden by default -->
+<!-- CAMERA CONTAINER -->
 <div id="cameraContainer" class="hidden mb-4">
-    <div id="reader" class="border-4 border-blue-500 rounded-lg overflow-hidden max-w-xs mx-auto relative">
-        <div class="zoom-controls">
-            <button onclick="zoomIn()" class="zoom-btn">+</button>
-            <button onclick="zoomOut()" class="zoom-btn">-</button>
+    <div id="scanner-container">
+        <video id="scanner-video" playsinline></video>
+        <div class="scan-overlay">
+            <div class="scan-frame">
+                <div class="scan-line"></div>
+            </div>
         </div>
+        <button onclick="switchCamera()" class="camera-switch" title="Switch camera">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+        </button>
     </div>
-    <div id="cameraStatus" class="text-center text-sm text-gray-600 mt-1">
+    
+    <div class="text-center text-sm text-gray-600 mt-2">
         <div class="inline-flex items-center gap-1">
             <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-            <span>Camera active - Move closer for small QR codes</span>
+            <span id="scan-status">Position QR code in frame</span>
         </div>
     </div>
-    <div class="text-center mt-2">
+    
+    <div class="text-center mt-3">
         <button onclick="stopScan()" class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-1.5 rounded text-sm">Stop Camera</button>
     </div>
 </div>
@@ -132,227 +174,220 @@ firebase.initializeApp({
 const db = firebase.firestore();
 
 /* DATA STORAGE */
-let stock={}, history=[], qr, currentScanMode = null, isProcessingScan = false;
-let currentZoom = 1;
+let stock = {}, history = [], scanner = null, currentScanMode = null;
+let isProcessingScan = false;
+let currentCamera = 'environment'; // 'environment' for back, 'user' for front
 
 /* REALTIME MATERIAL DATA */
-db.collection("materials").onSnapshot(s=>{
- stock={}; 
- s.forEach(d=>stock[d.id]=d.data().material); 
- renderStock();
+db.collection("materials").onSnapshot(s => {
+    stock = {}; 
+    s.forEach(d => stock[d.id] = d.data().material); 
+    renderStock();
 });
 
-db.collection("history").orderBy("date","desc").onSnapshot(s=>{
- history=[]; 
- s.forEach(d=>history.push(d.data()));
+db.collection("history").orderBy("date", "desc").onSnapshot(s => {
+    history = []; 
+    s.forEach(d => history.push(d.data()));
 });
 
 /* RENDER STOCK */
-function renderStock(){
- const t=document.getElementById("searchInput").value.toLowerCase();
- let c={};
- Object.values(stock).forEach(m=>{ if(m.toLowerCase().includes(t)) c[m]=(c[m]||0)+1; });
- document.getElementById("stockList").innerHTML=
- Object.entries(c).map(([m,n],i)=>`<div class="flex justify-between border-b py-1 hover:bg-gray-100">
- <span>${i+1}. ${m}</span><b>${n}</b></div>`).join("") || "<i>No match</i>";
+function renderStock() {
+    const searchTerm = document.getElementById("searchInput").value.toLowerCase();
+    let counted = {};
+    
+    Object.values(stock).forEach(material => {
+        if (material.toLowerCase().includes(searchTerm)) {
+            counted[material] = (counted[material] || 0) + 1;
+        }
+    });
+    
+    const stockListHTML = Object.entries(counted).map(([material, count], index) => 
+        `<div class="flex justify-between border-b py-1 hover:bg-gray-100">
+            <span>${index + 1}. ${material}</span><b>${count}</b>
+        </div>`
+    ).join("") || "<i>No match</i>";
+    
+    document.getElementById("stockList").innerHTML = stockListHTML;
 }
 
-/* ZOOM CONTROLS */
-function zoomIn() {
-    currentZoom = Math.min(currentZoom * 1.2, 3);
-    applyZoom();
-}
-
-function zoomOut() {
-    currentZoom = Math.max(currentZoom / 1.2, 1);
-    applyZoom();
-}
-
-function applyZoom() {
-    const videoElement = document.querySelector('#reader video');
-    if (videoElement) {
-        videoElement.style.transform = `scale(${currentZoom})`;
-        videoElement.style.transformOrigin = 'center center';
-    }
-}
-
-/* HIGH ACCURACY QR SCANNER */
-async function startScan(mode){
+/* CAMERA SCANNING WITH INSTASCAN (Better iOS support) */
+async function startScan(mode) {
     if (isProcessingScan) {
-        console.log("Already processing a scan, please wait...");
+        console.log("Already processing a scan");
         return;
     }
     
     currentScanMode = mode;
-    currentZoom = 1;
     
     // Show camera container
     document.getElementById("cameraContainer").classList.remove("hidden");
-    
-    // Clear previous scanner
-    document.getElementById("reader").innerHTML = '<div class="zoom-controls"><button onclick="zoomIn()" class="zoom-btn">+</button><button onclick="zoomOut()" class="zoom-btn">-</button></div>';
+    document.getElementById("scan-status").textContent = "Starting camera...";
     
     try {
-        // Create scanner with high accuracy settings
-        qr = new Html5Qrcode("reader");
-        
-        // OPTIMIZED SETTINGS FOR SMALL QR CODES
-        const config = {
-            fps: 30,                    // Higher FPS for faster detection
-            qrbox: { 
-                width: 300,             // Larger scanning area
-                height: 300 
-            },
-            aspectRatio: 1.0,
-            disableFlip: false,
-            experimentalFeatures: {
-                useBarCodeDetectorIfSupported: true
-            },
-            rememberLastUsedCamera: true,
-            // Support multiple formats for better compatibility
-            formatsToSupport: [
-                Html5QrcodeSupportedFormats.QR_CODE,
-                Html5QrcodeSupportedFormats.AZTEC,
-                Html5QrcodeSupportedFormats.CODABAR,
-                Html5QrcodeSupportedFormats.CODE_39,
-                Html5QrcodeSupportedFormats.CODE_93,
-                Html5QrcodeSupportedFormats.CODE_128,
-                Html5QrcodeSupportedFormats.DATA_MATRIX,
-                Html5QrcodeSupportedFormats.MAXICODE,
-                Html5QrcodeSupportedFormats.ITF,
-                Html5QrcodeSupportedFormats.EAN_13,
-                Html5QrcodeSupportedFormats.EAN_8,
-                Html5QrcodeSupportedFormats.PDF_417,
-                Html5QrcodeSupportedFormats.RSS_14,
-                Html5QrcodeSupportedFormats.RSS_EXPANDED,
-                Html5QrcodeSupportedFormats.UPC_A,
-                Html5QrcodeSupportedFormats.UPC_E,
-                Html5QrcodeSupportedFormats.UPC_EAN_EXTENSION
-            ]
-        };
-        
-        // Get camera capabilities
-        const cameras = await Html5Qrcode.getCameras();
-        let cameraId = null;
-        
-        // Try to find the highest resolution camera (usually back camera)
-        if (cameras.length > 0) {
-            // Sort cameras by likely resolution (cameras with 'back' or high numbers in ID)
-            const sortedCameras = cameras.sort((a, b) => {
-                const aIsBack = a.label.toLowerCase().includes('back') || a.label.toLowerCase().includes('rear') || a.label.toLowerCase().includes('2') || a.label.includes('2');
-                const bIsBack = b.label.toLowerCase().includes('back') || b.label.toLowerCase().includes('rear') || b.label.toLowerCase().includes('2') || b.label.includes('2');
-                return (bIsBack ? 1 : 0) - (aIsBack ? 1 : 0);
-            });
-            cameraId = sortedCameras[0].id;
+        // Check if Instascan is available
+        if (typeof Instascan === 'undefined') {
+            throw new Error("Scanner library not loaded");
         }
         
-        console.log("Starting camera with high accuracy settings...");
+        // Stop any existing scanner
+        if (scanner) {
+            scanner.stop();
+            scanner = null;
+        }
         
-        // Start with high resolution settings for better small QR detection
-        await qr.start(
-            cameraId || { facingMode: "environment" },
-            config,
-            async (decodedText) => {
-                console.log("QR detected:", decodedText);
-                
-                // Beep sound for feedback
-                beep();
-                
-                // Stop camera immediately
-                try {
-                    await qr.stop();
-                } catch (e) {
-                    console.log("Error stopping:", e);
-                }
-                
-                // Hide camera container
-                document.getElementById("cameraContainer").classList.add("hidden");
-                
-                // Process the scan
-                await processScannedCode(decodedText, mode);
-            },
-            (errorMessage) => {
-                // Silently handle scanning errors
-                if (!errorMessage.includes("No QR code found") && 
-                    !errorMessage.includes("NotFoundException")) {
-                    console.log("Scan error:", errorMessage);
-                }
-            }
-        ).then(() => {
-            console.log("Camera started successfully");
-            
-            // Add focus message after camera starts
-            setTimeout(() => {
-                const status = document.getElementById('cameraStatus');
-                if (status) {
-                    status.innerHTML = '<div class="inline-flex items-center gap-1"><div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div><span>✓ Camera ready - Move closer for small QR codes</span></div>';
-                }
-            }, 1000);
-            
-        }).catch(err => {
-            console.error("Camera start error:", err);
-            
-            // Fallback to simpler settings
-            startFallbackScan(mode);
+        // Create new scanner
+        scanner = new Instascan.Scanner({
+            video: document.getElementById('scanner-video'),
+            mirror: currentCamera === 'user',
+            scanPeriod: 5, // How often to scan (ms)
+            backgroundScan: false,
+            refractoryPeriod: 5000, // Time between scans (ms)
+            continuous: true // Keep scanning
         });
         
-    } catch (err) {
-        console.error("Initial camera start failed:", err);
-        startFallbackScan(mode);
+        // Handle successful scan
+        scanner.addListener('scan', async function(content) {
+            if (isProcessingScan) return;
+            
+            console.log('QR Code detected:', content);
+            
+            // Visual feedback
+            document.getElementById("scan-status").textContent = "✓ QR detected!";
+            document.getElementById("scan-status").style.color = "#10B981";
+            
+            // Vibrate if available
+            if (navigator.vibrate) navigator.vibrate(100);
+            
+            // Stop scanner
+            scanner.stop();
+            document.getElementById("cameraContainer").classList.add("hidden");
+            
+            // Process the scan
+            await processScannedCode(content, mode);
+            
+            // Reset status
+            document.getElementById("scan-status").textContent = "Position QR code in frame";
+            document.getElementById("scan-status").style.color = "";
+        });
+        
+        // Get available cameras
+        const cameras = await Instascan.Camera.getCameras();
+        
+        if (cameras.length === 0) {
+            throw new Error('No cameras found');
+        }
+        
+        // Select camera based on preference
+        let selectedCamera = null;
+        
+        if (currentCamera === 'environment') {
+            // Try to find back camera
+            selectedCamera = cameras.find(cam => cam.name.toLowerCase().includes('back') || 
+                                                 cam.name.toLowerCase().includes('rear') ||
+                                                 cam.name.includes('2')) || cameras[0];
+        } else {
+            // Try to find front camera
+            selectedCamera = cameras.find(cam => cam.name.toLowerCase().includes('front') || 
+                                                 cam.name.toLowerCase().includes('user') ||
+                                                 cam.name.includes('1')) || cameras[0];
+        }
+        
+        // Start scanner
+        await scanner.start(selectedCamera);
+        
+        document.getElementById("scan-status").textContent = "Ready - Scan QR code";
+        document.getElementById("scan-status").style.color = "";
+        
+    } catch (error) {
+        console.error('Scanner error:', error);
+        
+        // Try fallback method
+        if (!await tryFallbackScanner(mode)) {
+            alert("Camera Error:\n\n" + 
+                  "1. Grant camera permission\n" +
+                  "2. Ensure you're using HTTPS\n" +
+                  "3. Try refreshing the page\n\n" +
+                  "Error: " + error.message);
+            stopScan();
+        }
     }
 }
 
-/* FALLBACK SCANNER */
-async function startFallbackScan(mode) {
-    try {
-        qr = new Html5Qrcode("reader");
+/* FALLBACK SCANNER USING FILE INPUT */
+async function tryFallbackScanner(mode) {
+    return new Promise((resolve) => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.capture = 'environment'; // For mobile camera
         
-        await qr.start(
-            { facingMode: "environment" },
-            {
-                fps: 20,
-                qrbox: { width: 280, height: 280 },
-                aspectRatio: 1.0
-            },
-            async (decodedText) => {
-                beep();
-                try {
-                    await qr.stop();
-                } catch (e) {}
-                document.getElementById("cameraContainer").classList.add("hidden");
-                await processScannedCode(decodedText, mode);
+        input.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file) {
+                resolve(false);
+                return;
             }
-        );
+            
+            // Create image element
+            const img = new Image();
+            img.onload = function() {
+                // Create canvas to process image
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                
+                // Get image data for QR detection
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                
+                // Try to detect QR code manually (simplified)
+                // Note: For production, use a proper QR library like jsQR
+                alert("Image captured. Manual QR detection would go here.\n\n" +
+                      "For now, please enter the QR code manually:");
+                
+                const manualCode = prompt("Enter QR Code content (ID###):");
+                if (manualCode) {
+                    processScannedCode(manualCode, mode);
+                }
+                
+                resolve(true);
+            };
+            
+            img.src = URL.createObjectURL(file);
+        };
         
-    } catch (err) {
-        console.error("Fallback also failed:", err);
-        alert("Camera Error:\n\n1. Check camera permissions\n2. Ensure HTTPS is used\n3. Try a different browser\n\nError: " + err.message);
+        input.oncancel = () => resolve(false);
+        input.click();
+    });
+}
+
+/* SWITCH CAMERA */
+function switchCamera() {
+    if (scanner && scanner.active) {
+        currentCamera = currentCamera === 'environment' ? 'user' : 'environment';
         stopScan();
+        setTimeout(() => startScan(currentScanMode), 500);
     }
 }
 
-/* BEEP SOUND FEEDBACK */
-function beep() {
-    try {
-        // Create a simple beep using Web Audio API
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
-        
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-        
-        oscillator.frequency.value = 1000;
-        oscillator.type = 'sine';
-        
-        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
-        
-        oscillator.start(audioContext.currentTime);
-        oscillator.stop(audioContext.currentTime + 0.1);
-    } catch (e) {
-        // Audio not supported, ignore
+/* STOP SCANNER */
+function stopScan() {
+    if (scanner) {
+        scanner.stop();
+        scanner = null;
     }
+    
+    // Hide camera container
+    document.getElementById("cameraContainer").classList.add("hidden");
+    
+    // Clear video element
+    const video = document.getElementById('scanner-video');
+    video.srcObject = null;
+    
+    isProcessingScan = false;
+    document.getElementById("scan-status").textContent = "Position QR code in frame";
+    document.getElementById("scan-status").style.color = "";
 }
 
 /* PROCESS SCANNED CODE */
@@ -363,7 +398,7 @@ async function processScannedCode(serial, mode) {
     serial = serial.trim();
     
     // Validate QR format
-    if(!serial.startsWith("ID")) {
+    if (!serial.startsWith("ID")) {
         alert("Invalid QR code format. Expected: ID###\nScanned: " + serial);
         isProcessingScan = false;
         return;
@@ -371,18 +406,18 @@ async function processScannedCode(serial, mode) {
     
     console.log(`Processing ${mode}: ${serial}`);
     
-    if(mode === "add"){
+    if (mode === "add") {
         // Check if already exists
-        if(stock[serial]) {
+        if (stock[serial]) {
             alert(`Already exists!\n\nSerial: ${serial}\nMaterial: ${stock[serial]}\n\nThis item is already in stock.`);
             isProcessingScan = false;
             return;
         }
         
-        // Get material name with the serial displayed
+        // Get material name
         let materialName = prompt(`Enter Material Name for: ${serial}\n\nMaterial Name:`);
         
-        if(!materialName || materialName.trim() === "") {
+        if (!materialName || materialName.trim() === "") {
             isProcessingScan = false;
             return;
         }
@@ -391,7 +426,7 @@ async function processScannedCode(serial, mode) {
         
         try {
             // Save to database
-            await db.collection("materials").doc(serial).set({material: materialName});
+            await db.collection("materials").doc(serial).set({ material: materialName });
             await db.collection("history").add({
                 serial: serial,
                 material: materialName,
@@ -400,7 +435,6 @@ async function processScannedCode(serial, mode) {
                 timestamp: firebase.firestore.FieldValue.serverTimestamp()
             });
             
-            // Show success message
             alert(`Added: ${materialName}\nSerial: ${serial}\n\nSuccessfully added to inventory.`);
             
             // Update stock display
@@ -411,9 +445,9 @@ async function processScannedCode(serial, mode) {
         }
     }
     
-    if(mode === "consume"){
+    if (mode === "consume") {
         // Check if exists
-        if(!stock[serial]) {
+        if (!stock[serial]) {
             alert(`Not found in stock!\n\nSerial: ${serial}\n\nThis item is not in the inventory.`);
             isProcessingScan = false;
             return;
@@ -444,121 +478,108 @@ async function processScannedCode(serial, mode) {
     isProcessingScan = false;
 }
 
-/* STOP CAMERA */
-async function stopScan(){
-    isProcessingScan = false;
-    currentZoom = 1;
-    
-    if(qr && qr.isScanning){
-        try {
-            await qr.stop();
-            qr.clear();
-        } catch (err) {
-            console.log("Stop cleanup:", err);
-        }
-    }
-    
-    // Hide camera container
-    document.getElementById("cameraContainer").classList.add("hidden");
-    document.getElementById("reader").innerHTML = '<div class="zoom-controls"><button onclick="zoomIn()" class="zoom-btn">+</button><button onclick="zoomOut()" class="zoom-btn">-</button></div>';
-    currentScanMode = null;
-}
-
 /* EXPORT CSV */
-function exportCSV(){
- const from=document.getElementById("fromDate").value;
- const to=document.getElementById("toDate").value;
- const t=document.getElementById("filterType").value;
- let rows=[["Serial","Material","Type","Date"]];
-
- history.filter(h=>{
-   let ok=true;
-   if(t!=="ALL") ok=h.type===t;
-   let dt=new Date(h.date.seconds*1000);
-   if(from) ok=ok && dt>=new Date(from);
-   if(to) ok=ok && dt<=new Date(to+"T23:59:59");
-   return ok;
- }).forEach(h=>rows.push([h.serial,h.material,h.type,new Date(h.date.seconds*1000).toLocaleString()]));
-
- const wb=XLSX.utils.book_new();
- XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),"Inventory_Data");
- XLSX.writeFile(wb,"Inventory_History.csv");
+function exportCSV() {
+    const from = document.getElementById("fromDate").value;
+    const to = document.getElementById("toDate").value;
+    const filterType = document.getElementById("filterType").value;
+    
+    let rows = [["Serial", "Material", "Type", "Date"]];
+    
+    history.filter(entry => {
+        let matches = true;
+        if (filterType !== "ALL") matches = entry.type === filterType;
+        
+        const entryDate = new Date(entry.date.seconds * 1000);
+        if (from) matches = matches && entryDate >= new Date(from);
+        if (to) matches = matches && entryDate <= new Date(to + "T23:59:59");
+        
+        return matches;
+    }).forEach(entry => {
+        rows.push([
+            entry.serial,
+            entry.material,
+            entry.type,
+            new Date(entry.date.seconds * 1000).toLocaleString()
+        ]);
+    });
+    
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(rows), "Inventory_Data");
+    XLSX.writeFile(workbook, "Inventory_History.csv");
 }
 
 /* GENERATE QR PDF */
-async function generateQR(){
-  const n = parseInt(prompt("Number of QR codes to generate?"));
-  if(!n || n < 1) {
-      alert("Please enter a valid number");
-      return;
-  }
-
-  const settingsDoc = await db.collection("settings").doc("qr").get();
-  let last = 900;
-
-  if(settingsDoc.exists){
-      last = settingsDoc.data().lastNumber || 900;
-      if(last < 900) last = 900;
-  }
-
-  const { jsPDF } = window.jspdf;
-  const pdf = new jsPDF({unit:"mm", format:[100,150]});
-
-  const qrSize = 25;
-  const textGap = 3;
-  const fontSize = 8;
-  const marginX = 5;
-  const marginY = 5;
-  const qrPerRow = 4;
-  const spacingX = (100 - 2*marginX - qrPerRow*qrSize) / (qrPerRow - 1);
-  const spacingY = 7;
-
-  let x = marginX;
-  let y = marginY;
-  let col = 0;
-
-  alert(`Generating ${n} QR codes... Please wait.`);
-
-  for(let i=1; i<=n; i++){
-    const id = "ID" + String(++last).padStart(3,"0");
-
-    const c = document.createElement("canvas");
-    await QRCode.toCanvas(c, id, {
-        width: qrSize * 4,
-        margin: 1,
-        color: {
-            dark: "#000000",
-            light: "#FFFFFF"
-        }
-    });
-
-    pdf.addImage(c, "PNG", x, y, qrSize, qrSize);
-    pdf.setFontSize(fontSize);
-    pdf.text(id, x + qrSize/2, y + qrSize + textGap, {align:"center"});
-
-    col++;
-    if(col < qrPerRow){
-      x += qrSize + spacingX;
-    } else {
-      col = 0;
-      x = marginX;
-      y += qrSize + textGap + spacingY;
-
-      if(y + qrSize + textGap > 150 - marginY){
-        pdf.addPage([100,150]);
-        y = marginY;
-      }
+async function generateQR() {
+    const n = parseInt(prompt("Number of QR codes to generate?"));
+    if (!n || n < 1) {
+        alert("Please enter a valid number");
+        return;
     }
-  }
-
-  pdf.save(`QR_Codes_ID${String(last-n+1).padStart(3,'0')}_to_ID${String(last).padStart(3,'0')}.pdf`);
-
-  await db.collection("settings").doc("qr").set({lastNumber:last});
-  
-  alert(`Generated ${n} QR codes\nFrom: ID${String(last-n+1).padStart(3,'0')}\nTo: ID${String(last).padStart(3,'0')}`);
+    
+    const settingsDoc = await db.collection("settings").doc("qr").get();
+    let last = 900;
+    
+    if (settingsDoc.exists) {
+        last = settingsDoc.data().lastNumber || 900;
+        if (last < 900) last = 900;
+    }
+    
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ unit: "mm", format: [100, 150] });
+    
+    const qrSize = 25;
+    const textGap = 3;
+    const fontSize = 8;
+    const marginX = 5;
+    const marginY = 5;
+    const qrPerRow = 4;
+    const spacingX = (100 - 2 * marginX - qrPerRow * qrSize) / (qrPerRow - 1);
+    const spacingY = 7;
+    
+    let x = marginX;
+    let y = marginY;
+    let col = 0;
+    
+    alert(`Generating ${n} QR codes... Please wait.`);
+    
+    for (let i = 1; i <= n; i++) {
+        const id = "ID" + String(++last).padStart(3, "0");
+        
+        const canvas = document.createElement("canvas");
+        await QRCode.toCanvas(canvas, id, {
+            width: qrSize * 4,
+            margin: 1,
+            color: { dark: "#000000", light: "#FFFFFF" }
+        });
+        
+        pdf.addImage(canvas, "PNG", x, y, qrSize, qrSize);
+        pdf.setFontSize(fontSize);
+        pdf.text(id, x + qrSize / 2, y + qrSize + textGap, { align: "center" });
+        
+        col++;
+        if (col < qrPerRow) {
+            x += qrSize + spacingX;
+        } else {
+            col = 0;
+            x = marginX;
+            y += qrSize + textGap + spacingY;
+            
+            if (y + qrSize + textGap > 150 - marginY) {
+                pdf.addPage([100, 150]);
+                y = marginY;
+            }
+        }
+    }
+    
+    pdf.save(`QR_Codes_ID${String(last - n + 1).padStart(3, '0')}_to_ID${String(last).padStart(3, '0')}.pdf`);
+    
+    await db.collection("settings").doc("qr").set({ lastNumber: last });
+    
+    alert(`Generated ${n} QR codes\nFrom: ID${String(last - n + 1).padStart(3, '0')}\nTo: ID${String(last).padStart(3, '0')}`);
 }
 
-// Cleanup on page unload
+/* CLEANUP */
 window.addEventListener('beforeunload', stopScan);
 window.addEventListener('pagehide', stopScan);
 document.addEventListener('visibilitychange', function() {

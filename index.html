@@ -13,6 +13,58 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+<style>
+    /* Custom styles for better camera visibility */
+    #reader {
+        position: relative;
+        background-color: #000;
+    }
+    
+    #reader video {
+        width: 100% !important;
+        height: auto !important;
+        object-fit: cover;
+    }
+    
+    /* Focus indicator */
+    .scan-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 10;
+    }
+    
+    .scan-region {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 70%;
+        height: 70%;
+        border: 2px solid rgba(59, 130, 246, 0.8);
+        border-radius: 8px;
+        box-shadow: 0 0 0 1000px rgba(0, 0, 0, 0.5);
+    }
+    
+    .scan-line {
+        position: absolute;
+        width: 100%;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, #3b82f6, transparent);
+        animation: scan 2s linear infinite;
+        border-radius: 1px;
+    }
+    
+    @keyframes scan {
+        0% { top: 0%; }
+        50% { top: 100%; }
+        100% { top: 0%; }
+    }
+</style>
 </head>
 
 <body class="bg-gray-100 p-6">
@@ -20,32 +72,32 @@
 
 <!-- HEADER -->
 <div class="flex items-center gap-4 mb-4">
-<img class="w-20" src="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgra2sfgJ1ZE0ub9g2_geCiFkRrdEhgzI_LQ7qkySYRO9ss4QHHWGTL-HlniFl5AuPq5uu7gtQKvrgyregnbofmhQau5V6kWzcwQcj7G-Wpl2tIXPIfEKOLUbX781JbJbNiQ04dK-Q1TzBS/s268/Screenshot%20(4).png">
+<img class="w-20" src="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgra2sfgJ1ZE0ub9g2_geCiFkRrdEhgzI_LQ7qkySYRO9ss4QHHWGTL-HlniFl5AuPq5uu7gtQKvrgyregnbofmhQau5V6kWzcwQcj7G-Wpl2tIXPIfEKOLUbX781JbJbNiQ04dK-Q1TzBS/s268/Screenshot%20(4).png>
 <h1 class="text-2xl font-bold">Guruvel Creativities Inventory</h1>
 </div>
 
 <!-- MAIN BUTTONS -->
 <div class="flex flex-wrap gap-2 mb-4">
-<button onclick="generateQR()" class="bg-blue-600 text-white px-4 py-2 rounded">Generate QR</button>
-<button onclick="startScan('add')" class="bg-green-600 text-white px-4 py-2 rounded">Add</button>
-<button onclick="startScan('consume')" class="bg-red-600 text-white px-4 py-2 rounded">Consume</button>
+<button onclick="generateQR()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Generate QR</button>
+<button onclick="startScan('add')" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Add</button>
+<button onclick="startScan('consume')" class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">Consume</button>
 </div>
 
 <!-- MATERIAL SEARCH -->
 <input id="searchInput" oninput="renderStock()" placeholder="Search material..."
 class="w-full border p-2 rounded mb-4">
 
-<!-- CAMERA CONTAINER -->
-<div class="mb-4">
-    <div id="reader" class="border-4 border-blue-400 rounded-lg overflow-hidden max-w-xs mx-auto"></div>
-    <div id="cameraStatus" class="text-center text-sm text-gray-600 mt-1 hidden">
+<!-- CAMERA CONTAINER - Hidden by default -->
+<div id="cameraContainer" class="hidden mb-4">
+    <div id="reader" class="border-4 border-blue-500 rounded-lg overflow-hidden max-w-xs mx-auto relative"></div>
+    <div id="cameraStatus" class="text-center text-sm text-gray-600 mt-1">
         <div class="inline-flex items-center gap-1">
             <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-            <span>Camera active - Scan QR code</span>
+            <span>Camera active - Center QR in box</span>
         </div>
     </div>
     <div class="text-center mt-2">
-        <button id="stopBtn" onclick="stopScan()" class="bg-yellow-500 text-white px-4 py-1.5 rounded text-sm hidden">Stop Camera</button>
+        <button onclick="stopScan()" class="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-1.5 rounded text-sm">Stop Camera</button>
     </div>
 </div>
 
@@ -75,7 +127,7 @@ class="w-full border p-2 rounded mb-4">
             <option value="Consume">Consume</option>
         </select>
         
-        <button onclick="exportCSV()" class="bg-indigo-600 text-white rounded px-4 h-10">Export CSV</button>
+        <button onclick="exportCSV()" class="bg-indigo-600 text-white rounded px-4 h-10 hover:bg-indigo-700">Export CSV</button>
     </div>
 </div>
 
@@ -91,7 +143,7 @@ firebase.initializeApp({
 const db = firebase.firestore();
 
 /* DATA STORAGE */
-let stock={}, history=[], qr;
+let stock={}, history=[], qr, currentScanMode = null;
 
 /* REALTIME MATERIAL DATA */
 db.collection("materials").onSnapshot(s=>{
@@ -111,114 +163,226 @@ function renderStock(){
  let c={};
  Object.values(stock).forEach(m=>{ if(m.toLowerCase().includes(t)) c[m]=(c[m]||0)+1; });
  document.getElementById("stockList").innerHTML=
- Object.entries(c).map(([m,n],i)=>`<div class="flex justify-between border-b py-1">
+ Object.entries(c).map(([m,n],i)=>`<div class="flex justify-between border-b py-1 hover:bg-gray-100">
  <span>${i+1}. ${m}</span><b>${n}</b></div>`).join("") || "<i>No match</i>";
 }
 
-/* CAMERA SCAN - IMPROVED */
-let isScanning = false;
-
-function startScan(mode){
-    if(isScanning) {
-        stopScan();
-        setTimeout(() => startScan(mode), 100);
-        return;
-    }
+/* CAMERA SCAN - OPTIMIZED FOR SHARPNESS & IPHONE */
+async function startScan(mode){
+    currentScanMode = mode;
     
-    document.getElementById("stopBtn").classList.remove("hidden");
-    document.getElementById("cameraStatus").classList.remove("hidden");
-    isScanning = true;
+    // Show camera container
+    document.getElementById("cameraContainer").classList.remove("hidden");
     
     // Clear previous scanner
     document.getElementById("reader").innerHTML = "";
     
+    try {
+        // Try to get available cameras for better selection
+        const cameras = await Html5Qrcode.getCameras();
+        console.log("Available cameras:", cameras);
+        
+        let cameraId = null;
+        
+        // Prefer rear camera on mobile devices
+        if (cameras.length > 0) {
+            // Look for rear camera (environment) first
+            const rearCamera = cameras.find(cam => 
+                cam.label.toLowerCase().includes('rear') || 
+                cam.label.toLowerCase().includes('back') ||
+                cam.label.toLowerCase().includes('environment') ||
+                cam.id.includes('environment')
+            );
+            
+            cameraId = rearCamera ? rearCamera.id : cameras[0].id;
+        }
+        
+        qr = new Html5Qrcode("reader");
+        
+        // OPTIMIZED SETTINGS FOR SHARPNESS:
+        const config = {
+            fps: 30,                     // Higher FPS for smoother video
+            qrbox: { 
+                width: 280, 
+                height: 280 
+            },
+            aspectRatio: 1.0,           // Square aspect ratio
+            disableFlip: false,
+            focusMode: "continuous",    // Continuous focus for better sharpness
+            experimentalFeatures: {
+                useBarCodeDetectorIfSupported: true
+            },
+            formatsToSupport: [
+                Html5QrcodeSupportedFormats.QR_CODE
+            ],
+            videoConstraints: {
+                facingMode: { exact: "environment" }, // Force rear camera
+                width: { min: 1280, ideal: 1920, max: 2560 }, // Higher resolution
+                height: { min: 720, ideal: 1080, max: 1440 },
+                focusMode: "continuous", // iOS compatible focus mode
+                resizeMode: "crop-and-scale"
+            }
+        };
+        
+        // Start scanning with optimized settings
+        await qr.start(
+            cameraId || { facingMode: "environment" },
+            config,
+            onScanSuccess,
+            onScanError
+        );
+        
+        // Add scanning overlay for better UX
+        addScanOverlay();
+        
+    } catch (err) {
+        console.error("Camera start failed:", err);
+        
+        // Fallback to simpler settings if advanced ones fail
+        if (err.toString().includes("constraints") || err.toString().includes("videoConstraints")) {
+            alert("Using basic camera mode...");
+            startSimpleScan(mode);
+        } else {
+            alert("Camera access failed: " + err.message);
+            stopScan();
+        }
+    }
+}
+
+// Fallback simple scanner
+function startSimpleScan(mode) {
+    currentScanMode = mode;
     qr = new Html5Qrcode("reader");
-    
-    // Optimized scanner settings for better accuracy
-    const config = {
-        fps: 15,
-        qrbox: { 
-            width: 250, 
-            height: 250 
-        },
-        aspectRatio: 1.0,
-        disableFlip: false,
-        focusMode: "continuous" // Improved focus
-    };
     
     qr.start(
         { facingMode: "environment" },
-        config,
-        decodedText => {
-            handleScan(decodedText, mode);
-            // Auto stop after successful scan
-            stopScan();
+        {
+            fps: 20,
+            qrbox: { width: 250, height: 250 },
+            aspectRatio: 1.0
         },
-        errorMessage => {
-            // Optional: Handle errors silently
-            console.log("Scan error:", errorMessage);
-        }
-    ).catch(err => {
-        console.error("Camera start failed:", err);
+        onScanSuccess,
+        onScanError
+    ).then(() => {
+        addScanOverlay();
+    }).catch(err => {
+        console.error("Simple scan failed:", err);
+        alert("Failed to start camera: " + err.message);
         stopScan();
     });
 }
 
-function stopScan(){
-    if(qr && isScanning){
-        qr.stop().then(() => {
-            document.getElementById("reader").innerHTML = "";
-            document.getElementById("stopBtn").classList.add("hidden");
-            document.getElementById("cameraStatus").classList.add("hidden");
-            isScanning = false;
-        }).catch(err => {
-            console.error("Stop failed:", err);
-            document.getElementById("reader").innerHTML = "";
-            document.getElementById("stopBtn").classList.add("hidden");
-            document.getElementById("cameraStatus").classList.add("hidden");
-            isScanning = false;
-        });
-    } else {
-        document.getElementById("reader").innerHTML = "";
-        document.getElementById("stopBtn").classList.add("hidden");
-        document.getElementById("cameraStatus").classList.add("hidden");
-        isScanning = false;
+// Add visual overlay for scanning
+function addScanOverlay() {
+    const reader = document.getElementById("reader");
+    const overlay = document.createElement("div");
+    overlay.className = "scan-overlay";
+    overlay.innerHTML = `
+        <div class="scan-region">
+            <div class="scan-line"></div>
+        </div>
+        <div class="absolute top-2 left-2 text-white text-xs bg-black bg-opacity-50 px-2 py-1 rounded">
+            ${currentScanMode === 'add' ? 'Adding Item' : 'Consuming Item'}
+        </div>
+    `;
+    reader.appendChild(overlay);
+}
+
+function onScanSuccess(decodedText) {
+    console.log("Scanned:", decodedText);
+    
+    // Vibrate on successful scan (if supported)
+    if (navigator.vibrate) {
+        navigator.vibrate(100);
     }
+    
+    handleScan(decodedText, currentScanMode);
+    
+    // Auto stop camera after successful scan
+    setTimeout(() => stopScan(), 500);
+}
+
+function onScanError(errorMessage) {
+    // Silently handle errors, don't spam console
+    if (!errorMessage.includes("No QR code found")) {
+        console.log("Scan error:", errorMessage);
+    }
+}
+
+async function stopScan(){
+    if(qr && qr.isScanning){
+        try {
+            await qr.stop();
+            qr.clear();
+        } catch (err) {
+            console.log("Stop cleanup:", err);
+        }
+    }
+    
+    // Reset UI - Hide camera container
+    document.getElementById("reader").innerHTML = "";
+    document.getElementById("cameraContainer").classList.add("hidden");
+    currentScanMode = null;
 }
 
 /* SCAN LOGIC */
 async function handleScan(s,m){
- s=s.trim(); 
- if(!s.startsWith("ID")) {
-     alert("Invalid QR code format. Expected ID###");
-     return;
- }
- 
- if(m==="add"){
-  if(stock[s]) {
-      alert("Material already exists!");
-      return;
-  }
-  let mat=prompt("Material name?");
-  if(!mat) return;
-  await db.collection("materials").doc(s).set({material:mat});
-  await db.collection("history").add({serial:s,material:mat,type:"Add",date:new Date()});
-  alert(`Added: ${mat} (${s})`);
- }
- 
- if(m==="consume"){
-  if(!stock[s]) {
-      alert("Material not found in stock!");
-      return;
-  }
-  let mat=stock[s];
-  await db.collection("materials").doc(s).delete();
-  await db.collection("history").add({serial:s,material:mat,type:"Consume",date:new Date()});
-  alert(`Consumed: ${mat} (${s})`);
- }
- 
- // Update display immediately
- renderStock();
+    s=s.trim(); 
+    if(!s.startsWith("ID")) {
+        alert("Invalid QR code format. Expected ID###");
+        return;
+    }
+    
+    // Add slight delay for better UX
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    if(m==="add"){
+        if(stock[s]) {
+            alert("⚠️ Material already exists!\n\n" + 
+                  `Serial: ${s}\nMaterial: ${stock[s]}\n\nPlease scan a different QR code.`);
+            return;
+        }
+        let mat=prompt(`Enter material name for QR: ${s}`);
+        if(!mat || mat.trim() === "") return;
+        mat = mat.trim();
+        
+        await db.collection("materials").doc(s).set({material:mat});
+        await db.collection("history").add({
+            serial:s,
+            material:mat,
+            type:"Add",
+            date:new Date(),
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        alert(`✅ Added: ${mat}\nSerial: ${s}`);
+    }
+    
+    if(m==="consume"){
+        if(!stock[s]) {
+            alert("❌ Material not found in stock!\n\n" +
+                  `Serial: ${s}\n\nThis QR code is not in the inventory.`);
+            return;
+        }
+        let mat=stock[s];
+        
+        // Confirm consumption
+        if(!confirm(`Consume this material?\n\n${mat}\nSerial: ${s}`)) {
+            return;
+        }
+        
+        await db.collection("materials").doc(s).delete();
+        await db.collection("history").add({
+            serial:s,
+            material:mat,
+            type:"Consume",
+            date:new Date(),
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        alert(`✅ Consumed: ${mat}\nSerial: ${s}`);
+    }
+    
+    // Update display immediately
+    renderStock();
 }
 
 /* EXPORT CSV */
@@ -244,8 +408,11 @@ function exportCSV(){
 
 /* GENERATE QR PDF (tracks last printed number) */
 async function generateQR(){
-  const n = parseInt(prompt("Number of QR codes?"));
-  if(!n || n < 1) return;
+  const n = parseInt(prompt("Number of QR codes to generate?"));
+  if(!n || n < 1) {
+      alert("Please enter a valid number");
+      return;
+  }
 
   // Get last printed QR number from Firestore
   const settingsDoc = await db.collection("settings").doc("qr").get();
@@ -272,11 +439,21 @@ async function generateQR(){
   let y = marginY;
   let col = 0;
 
+  // Show loading
+  alert(`Generating ${n} QR codes... Please wait.`);
+
   for(let i=1; i<=n; i++){
     const id = "ID" + String(++last).padStart(3,"0");
 
     const c = document.createElement("canvas");
-    await QRCode.toCanvas(c, id, {width: qrSize*3}); // higher resolution
+    await QRCode.toCanvas(c, id, {
+        width: qrSize * 4, // Higher resolution for better print quality
+        margin: 1,
+        color: {
+            dark: "#000000",
+            light: "#FFFFFF"
+        }
+    });
 
     pdf.addImage(c, "PNG", x, y, qrSize, qrSize);
     pdf.setFontSize(fontSize);
@@ -297,16 +474,24 @@ async function generateQR(){
     }
   }
 
-  pdf.save("QR_Codes.pdf");
+  pdf.save(`QR_Codes_ID${String(last-n+1).padStart(3,'0')}_to_ID${String(last).padStart(3,'0')}.pdf`);
 
   // Save last printed number to Firestore
   await db.collection("settings").doc("qr").set({lastNumber:last});
   
-  alert(`Generated ${n} QR codes from ID${String(last-n+1).padStart(3,'0')} to ID${String(last).padStart(3,'0')}`);
+  alert(`✅ Generated ${n} QR codes\nFrom: ID${String(last-n+1).padStart(3,'0')}\nTo: ID${String(last).padStart(3,'0')}`);
 }
 
 // Auto-stop camera when leaving page
 window.addEventListener('beforeunload', stopScan);
+window.addEventListener('pagehide', stopScan);
+
+// Handle page visibility changes
+document.addEventListener('visibilitychange', function() {
+    if (document.hidden) {
+        stopScan();
+    }
+});
 
 </script>
 </body>

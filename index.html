@@ -1,369 +1,171 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Guruvel Creativities Inventory</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guruvel Creativities Inventory</title>
 
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/html5-qrcode"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/html5-qrcode"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 </head>
-<body class="bg-gray-100 min-h-screen flex flex-col items-center p-6 font-sans">
 
-  <div class="max-w-3xl w-full bg-white rounded-lg shadow-lg p-6">
-    <div class="flex items-center mb-6 space-x-4">
-      <img class="w-24" src="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgra2sfgJ1ZE0ub9g2_geCiFkRrdEhgzI_LQ7qkySYRO9ss4QHHWGTL-HlniFl5AuPq5uu7gtQKvrgyregnbofmhQau5V6kWzcwQcj7G-Wpl2tIXPIfEKOLUbX781JbJbNiQ04dK-Q1TzBS/s268/Screenshot+%25284%2529.png" alt="Logo" />
-      <h1 class="text-3xl font-bold text-gray-800">Guruvel Creativities Inventory</h1>
-    </div>
+<body class="bg-gray-100 p-6">
+<div class="max-w-3xl mx-auto bg-white rounded shadow p-6">
 
-    <div class="flex flex-wrap gap-3 mb-6">
-      <button class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded shadow transition" onclick="startScan('add')">➕ Add Stock</button>
-      <button class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded shadow transition" onclick="startScan('consume')">➖ Consume</button>
-      <button class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded shadow transition" onclick="generateMultipleQRCodes()">📄 Generate QR Codes</button>
-      <button class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded shadow transition" onclick="exportHistoryToExcel()">📤 Export History</button>
-      <button class="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded shadow transition" onclick="resetHistory()">🗑️ Reset History</button>
-    </div>
+<!-- HEADER -->
+<div class="flex items-center gap-4 mb-4">
+<img class="w-20" src="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEgra2sfgJ1ZE0ub9g2_geCiFkRrdEhgzI_LQ7qkySYRO9ss4QHHWGTL-HlniFl5AuPq5uu7gtQKvrgyregnbofmhQau5V6kWzcwQcj7G-Wpl2tIXPIfEKOLUbX781JbJbNiQ04dK-Q1TzBS/s268/Screenshot%20(4).png">
+<h1 class="text-2xl font-bold">Guruvel Creativities Inventory</h1>
+</div>
 
-    <div class="flex flex-wrap gap-3 items-center mb-6">
-      <input type="date" id="filterDate" class="border border-gray-300 rounded px-3 py-2 shadow-sm" />
-      <select id="filterType" class="border border-gray-300 rounded px-3 py-2 shadow-sm">
-        <option value="">All Types</option>
-        <option value="Add">Add</option>
-        <option value="Consume">Consume</option>
-      </select>
-      <button class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded shadow transition" onclick="exportFilteredHistory()">📁 Export Filtered</button>
-    </div>
+<!-- MAIN BUTTONS -->
+<div class="flex flex-wrap gap-2 mb-4">
+<button onclick="generateQR()" class="bg-blue-600 text-white px-4 py-2 rounded">Generate QR</button>
+<button onclick="startScan('add')" class="bg-green-600 text-white px-4 py-2 rounded">Add</button>
+<button onclick="startScan('consume')" class="bg-red-600 text-white px-4 py-2 rounded">Consume</button>
+</div>
 
-    <input type="text" id="searchInput" placeholder="🔍 Search materials..." oninput="safeRenderList()" class="w-full mb-4 px-4 py-2 border border-gray-300 rounded shadow-sm" />
+<!-- MATERIAL SEARCH -->
+<input id="searchInput" oninput="renderStock()" placeholder="Search material..."
+class="w-full border p-2 rounded mb-4">
 
-    <div id="reader" class="w-full rounded border border-gray-300 bg-gray-50 p-3 mb-4"></div>
-    <button id="backButton" class="bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-4 rounded shadow transition mb-6 hidden" onclick="stopScan()">⬅️ Go Back</button>
+<!-- CAMERA -->
+<div id="reader"></div>
+<button id="stopBtn" onclick="stopScan()" class="hidden bg-yellow-500 text-white px-3 py-1 rounded mt-2">Stop Camera</button>
 
-    <div class="bg-gray-50 rounded p-4 shadow-inner">
-      <h2 class="text-xl font-semibold text-gray-700 mb-3 border-b border-gray-300 pb-2">Current Stock</h2>
-      <div id="stockList" class="text-gray-800 text-lg min-h-[100px]">
-        <i>Loading...</i>
-      </div>
-    </div>
-  </div>
+<!-- STOCK -->
+<div class="mt-4 bg-gray-50 p-4 rounded">
+<h2 class="font-semibold mb-2">Current Stock</h2>
+<div id="stockList"><i>Loading…</i></div>
+</div>
 
-  <script>
-    let db = {};
-    let historyLog = [];
-    let html5QrCode;
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyBmXJZ6dm-SLzzIvz9P22kXI23MwdW3WC0",
-      authDomain: "material-tracker-49dac.firebaseapp.com",
-      projectId: "material-tracker-49dac",
-      storageBucket: "material-tracker-49dac.appspot.com",
-      messagingSenderId: "548291877330",
-      appId: "1:548291877330:web:94a5d62b40058ad480100b"
-    };
-
-    firebase.initializeApp(firebaseConfig);
-    const dbFirebase = firebase.firestore();
-
-    function renderList() {
-      const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-      let stock = {};
-
-      for (let serial in db) {
-        let material = db[serial];
-        if (material.toLowerCase().includes(searchTerm)) {
-          stock[material] = (stock[material] || 0) + 1;
-        }
-      }
-
-      const entries = Object.entries(stock);
-      let html = entries.map(([mat, count], index) =>
-        `<div class="border-b py-1 flex justify-between">
-          <span class="text-gray-600">${index + 1}.</span>
-          <span class="flex-1 ml-2">${mat}</span>
-          <span class="font-semibold">${count}</span>
-        </div>`
-      ).join('');
-
-      document.getElementById('stockList').innerHTML = html || '<i>No materials match search.</i>';
-    }
-
-    function safeRenderList() {
-      if (typeof db !== 'undefined') renderList();
-    }
-
-    async function loadFromFirestore() {
-      db = {};
-      historyLog = [];
-
-      const materialsSnapshot = await dbFirebase.collection('materials').get();
-      materialsSnapshot.forEach(doc => {
-        db[doc.id] = doc.data().material;
-      });
-
-      const historySnapshot = await dbFirebase.collection('history').orderBy('date').get();
-      historySnapshot.forEach(doc => {
-        historyLog.push(doc.data());
-      });
-
-      renderList();
-    }
-
-    function listenMaterialsRealtime() {
-      dbFirebase.collection('materials').onSnapshot(snapshot => {
-        snapshot.docChanges().forEach(change => {
-          const serial = change.doc.id;
-          const data = change.doc.data();
-
-          if (change.type === "added" || change.type === "modified") {
-            db[serial] = data.material;
-          } else if (change.type === "removed") {
-            delete db[serial];
-          }
-        });
-        renderList();
-      });
-    }
-    async function generateMultipleQRCodes() {
-    // Get quantity from user
-    const count = parseInt(prompt("How many QR codes to generate?", "10"));
-    if (isNaN(count) || count <= 0) return alert("Invalid number");
-
-    // Get material name
-    const materialName = prompt("Enter material name for these QR codes:");
-    if (!materialName) return;
-
-    // Initialize lastSerialNum if not exists
-    if (typeof window.lastSerialNum === 'undefined') {
-        window.lastSerialNum = 0;
-    }
-
-    // Show loading indicator
-    const loading = document.createElement('div');
-    loading.style.position = 'fixed';
-    loading.style.top = '0';
-    loading.style.left = '0';
-    loading.style.width = '100%';
-    loading.style.height = '100%';
-    loading.style.backgroundColor = 'rgba(0,0,0,0.7)';
-    loading.style.color = 'white';
-    loading.style.display = 'flex';
-    loading.style.justifyContent = 'center';
-    loading.style.alignItems = 'center';
-    loading.style.zIndex = '1000';
-    loading.innerHTML = '<div style="font-size:24px">Generating QR codes...</div>';
-    document.body.appendChild(loading);
-
-    try {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF({
-            unit: 'mm',
-            format: [100, 150], // 100mm x 150mm paper
-            hotfixes: ["px_scaling"] // Fix PDF scaling
-        });
-
-        // Page layout calculations
-        const qrSize = 16; // QR code size in mm
-        const cols = 4;    // 4 per row
-        const xMargin = (100 - (cols * qrSize)) / (cols + 1); // Equal left/right margins
-        const yMargin = 10; // Top margin
-        const ySpacing = 8; // Vertical space between QR rows
-        const textHeight = 5; // Space for serial text
-        const rowsPerPage = Math.floor((150 - yMargin - textHeight) / (qrSize + ySpacing));
-
-        let currentPage = 0;
-        let positionOnPage = 0;
-        const generatedSerials = [];
-
-        for (let i = 0; i < count; i++) {
-            const serial = "ID" + (++window.lastSerialNum).toString().padStart(3, '0');
-            generatedSerials.push({ serial, material: materialName });
-            
-            // Calculate position
-            const row = Math.floor(positionOnPage / cols);
-            const col = positionOnPage % cols;
-            const x = xMargin + col * (qrSize + xMargin);
-            const y = yMargin + row * (qrSize + ySpacing);
-
-            // Generate QR code
-            const qrCanvas = document.createElement('canvas');
-            await new Promise(resolve => {
-                QRCode.toCanvas(qrCanvas, serial, {
-                    width: qrSize * 5, // High resolution (5 pixels per mm)
-                    margin: 1,
-                    color: { dark: '#000000', light: '#ffffff' }
-                }, resolve);
-            });
-
-            // Add to PDF
-            doc.addImage(qrCanvas, 'PNG', x, y, qrSize, qrSize);
-            
-            // Add serial text (centered below QR)
-            doc.setFontSize(10);
-            doc.text(serial, x + qrSize/2, y + qrSize + 4, { align: 'center' });
-            
-            // Add material name (smaller font)
-            doc.setFontSize(6);
-            doc.text(materialName.substring(0, 20), x + qrSize/2, y + qrSize + 7, { align: 'center' });
-
-            positionOnPage++;
-            
-            // New page if needed
-            if (positionOnPage >= cols * rowsPerPage && i < count - 1) {
-                doc.addPage([100, 150]);
-                positionOnPage = 0;
-                currentPage++;
-            }
-        }
-
-        // Save PDF
-        doc.save(`QR_Codes_${materialName}_${count}.pdf`);
+<!-- EXPORT HISTORY -->
+<div class="mt-6 bg-gray-50 p-4 rounded">
+    <h2 class="font-semibold mb-2">Export History</h2>
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-2">
+        <div class="relative">
+            <label class="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm pointer-events-none mr-1">From:</label>
+            <input type="date" id="fromDate" class="border p-1.5 rounded pl-11 w-full h-10 text-sm">
+        </div>
         
-        // Remove loading indicator
-        document.body.removeChild(loading);
+        <div class="relative">
+            <label class="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm pointer-events-none mr-1">To:</label>
+            <input type="date" id="toDate" class="border p-1.5 rounded pl-8 w-full h-10 text-sm">
+        </div>
         
-        // Ask if user wants to add to database
-        if (confirm(`Generated ${count} QR codes for "${materialName}". Add these items to inventory?`)) {
-            for (const item of generatedSerials) {
-                await dbFirebase.collection("materials").doc(item.serial).set({ 
-                    material: item.material 
-                });
-                await dbFirebase.collection("history").add({
-                    serial: item.serial,
-                    material: item.material,
-                    type: "Add",
-                    date: new Date()
-                });
-            }
-            alert(`${count} items added to inventory!`);
-        }
+        <select id="filterType" class="border p-2 rounded h-10">
+            <option value="ALL">All</option>
+            <option value="Add">Add</option>
+            <option value="Consume">Consume</option>
+        </select>
+        
+        <button onclick="exportCSV()" class="bg-indigo-600 text-white rounded px-4 h-10">Export CSV</button>
+    </div>
+</div>
 
-    } catch (error) {
-        console.error("Error generating QR codes:", error);
-        alert("Error generating QR codes: " + error.message);
-        document.body.removeChild(loading);
-    }
+</div>
+
+<script>
+/* FIREBASE */
+firebase.initializeApp({
+ apiKey: "AIzaSyBmXJZ6dm-SLzzIvz9P22kXI23MwdW3WC0",
+ authDomain: "material-tracker-49dac.firebaseapp.com",
+ projectId: "material-tracker-49dac"
+});
+const db = firebase.firestore();
+
+let stock={}, history=[], qr;
+
+/* REALTIME DATA */
+db.collection("materials").onSnapshot(s=>{
+ stock={}; s.forEach(d=>stock[d.id]=d.data().material); renderStock();
+});
+db.collection("history").orderBy("date","desc").onSnapshot(s=>{
+ history=[]; s.forEach(d=>history.push(d.data()));
+});
+
+/* RENDER STOCK */
+function renderStock(){
+ const t=document.getElementById("searchInput").value.toLowerCase();
+ let c={};
+ Object.values(stock).forEach(m=>{ if(m.toLowerCase().includes(t)) c[m]=(c[m]||0)+1; });
+ document.getElementById("stockList").innerHTML=
+ Object.entries(c).map(([m,n],i)=>`<div class="flex justify-between border-b py-1">
+ <span>${i+1}. ${m}</span><b>${n}</b></div>`).join("") || "<i>No match</i>";
 }
-    function startScan(mode) {
-      document.getElementById("reader").innerHTML = "";
-      document.getElementById("backButton").classList.remove("hidden");
 
-      html5QrCode = new Html5Qrcode("reader");
+/* CAMERA */
+function startScan(mode){
+ document.getElementById("stopBtn").classList.remove("hidden");
+ qr=new Html5Qrcode("reader");
+ qr.start({facingMode:"environment"},{fps:10,qrbox:250},t=>{qr.stop();handleScan(t,mode);});
+}
+function stopScan(){ qr?.stop(); reader.innerHTML=""; stopBtn.classList.add("hidden"); }
 
-      const config = { fps: 10, qrbox: 250 };
+/* SCAN LOGIC */
+async function handleScan(s,m){
+ s=s.trim(); if(!s.startsWith("ID")) return alert("Invalid QR");
+ if(m==="add"){
+  if(stock[s]) return alert("Already exists");
+  let mat=prompt("Material name?"); if(!mat) return;
+  await db.collection("materials").doc(s).set({material:mat});
+  await db.collection("history").add({serial:s,material:mat,type:"Add",date:new Date()});
+ }
+ if(m==="consume"){
+  if(!stock[s]) return alert("Not found");
+  let mat=stock[s];
+  await db.collection("materials").doc(s).delete();
+  await db.collection("history").add({serial:s,material:mat,type:"Consume",date:new Date()});
+ }
+}
 
-      html5QrCode.start(
-        { facingMode: "environment" },
-        config,
-        async (decodedText, decodedResult) => {
-          await html5QrCode.stop();
-          document.getElementById("backButton").classList.add("hidden");
-          document.getElementById("reader").innerHTML = "";
-          handleScannedCode(decodedText, mode);
-        }
-      ).catch((err) => {
-        alert("Camera access failed. Please allow permission and try again.");
-      });
-    }
+/* EXPORT CSV with single or range date */
+function exportCSV(){
+ const from=document.getElementById("fromDate").value;
+ const to=document.getElementById("toDate").value;
+ const t=document.getElementById("filterType").value;
+ let rows=[["Serial","Material","Type","Date"]];
 
-    function stopScan() {
-      if (html5QrCode) {
-        html5QrCode.stop().then(() => {
-          document.getElementById("reader").innerHTML = "";
-          document.getElementById("backButton").classList.add("hidden");
-        });
-      }
-    }
+ history.filter(h=>{
+   let ok=true;
+   if(t!=="ALL") ok=h.type===t;
+   let dt=new Date(h.date.seconds*1000);
+   if(from) ok=ok && dt>=new Date(from);
+   if(to) ok=ok && dt<=new Date(to+"T23:59:59");
+   return ok;
+ }).forEach(h=>rows.push([h.serial,h.material,h.type,new Date(h.date.seconds*1000).toLocaleString()]));
 
-    function handleScannedCode(scannedText, mode) {
-      if (!scannedText) return;
-      const serial = scannedText.trim();
-      const timestamp = new Date();
+ const wb=XLSX.utils.book_new();
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),"History");
+ XLSX.writeFile(wb,"Inventory_History.csv");
+}
 
-      if (mode === "add") {
-        if (db[serial]) {
-          alert("Material with this serial already exists!");
-          return;
-        }
+/* GENERATE QR PDF (100×150 mm) */
+async function generateQR(){
+ const n=parseInt(prompt("Number of QR codes?")); if(!n) return;
+ let last=0;
+ const snap=await db.collection("materials").get();
+ snap.forEach(d=>{ const x=parseInt(d.id.replace("ID","")); if(x>last) last=x; });
 
-        const materialName = prompt("Enter material name for this serial:");
-        if (!materialName) return;
-
-        dbFirebase.collection("materials").doc(serial).set({ material: materialName });
-        dbFirebase.collection("history").add({
-          serial,
-          material: materialName,
-          type: "Add",
-          date: timestamp
-        });
-        alert(`Material added: ${materialName}`);
-      } else if (mode === "consume") {
-        if (db[serial]) {
-          const materialName = db[serial];
-          dbFirebase.collection("materials").doc(serial).delete();
-          dbFirebase.collection("history").add({
-            serial,
-            material: materialName,
-            type: "Consume",
-            date: timestamp
-          });
-          alert(`Material consumed: ${materialName}`);
-        } else {
-          alert("Material not found in inventory.");
-        }
-      }
-    }
-
-    function exportHistoryToExcel() {
-      const wsData = [["Serial", "Material", "Type", "Date"]];
-      historyLog.forEach(entry => {
-        wsData.push([
-          entry.serial,
-          entry.material,
-          entry.type,
-          new Date(entry.date.seconds * 1000).toLocaleString()
-        ]);
-      });
-      const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.aoa_to_sheet(wsData);
-      XLSX.utils.book_append_sheet(wb, ws, "Material_History");
-      XLSX.writeFile(wb, "inventory_history.xlsx");
-    }
-
-    function exportFilteredHistory() {
-      const filterDate = document.getElementById("filterDate").value;
-      const filterType = document.getElementById("filterType").value;
-      const wsData = [["Serial", "Material", "Type", "Date"]];
-      const filtered = historyLog.filter(entry => {
-        const entryDate = new Date(entry.date.seconds * 1000);
-        const matchesDate = filterDate ? entryDate.toISOString().split("T")[0] === filterDate : true;
-        const matchesType = filterType ? entry.type === filterType : true;
-        return matchesDate && matchesType;
-      });
-      filtered.forEach(entry => {
-        wsData.push([
-          entry.serial,
-          entry.material,
-          entry.type,
-          new Date(entry.date.seconds * 1000).toLocaleString()
-        ]);
-      });
-      const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.aoa_to_sheet(wsData);
-      XLSX.utils.book_append_sheet(wb, ws, "Filtered History");
-      XLSX.writeFile(wb, "filtered_inventory_history.xlsx");
-    }
-
-    window.onload = async () => {
-      await loadFromFirestore();
-      listenMaterialsRealtime();
-    };
-  </script>
+ const {jsPDF}=window.jspdf;
+ const pdf=new jsPDF({unit:"mm",format:[100,150]});
+ let x=10,y=10;
+ for(let i=1;i<=n;i++){
+  const id="ID"+String(++last).padStart(3,"0");
+  const c=document.createElement("canvas");
+  await QRCode.toCanvas(c,id,{width:120});
+  pdf.addImage(c,"PNG",x,y,25,25);
+  pdf.text(id,x+12.5,y+30,{align:"center"});
+  x+=30; if(x>70){x=10;y+=40;}
+ }
+ pdf.save("QR_100x150.pdf");
+}
+</script>
 </body>
 </html>
-
-

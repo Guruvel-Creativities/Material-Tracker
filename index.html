@@ -153,48 +153,54 @@ function exportCSV(){
 
 /* GENERATE QR PDF (tracks last printed number) */
 async function generateQR(){
- const n=parseInt(prompt("Number of QR codes?"));
- if(!n) return;
+  const n = parseInt(prompt("Number of QR codes?"));
+  if(!n) return;
 
- // Get last printed QR number from Firestore
- const settingsDoc = await db.collection("settings").doc("qr").get();
- let last = 0;
- if(settingsDoc.exists){
-     last = settingsDoc.data().lastNumber || 0;
- }
+  // Get last printed QR number from Firestore
+  const settingsDoc = await db.collection("settings").doc("qr").get();
+  let last = 0;
+  if(settingsDoc.exists){
+      last = settingsDoc.data().lastNumber || 0;
+  }
 
- const { jsPDF } = window.jspdf;
- const pdf = new jsPDF({unit:"mm", format:[100,150]});
- const qrSize=20;
- const qrPerRow=4;
- const qrPerColumn=6;
- const horizontalSpacing=25;
- const verticalSpacing=27;
- const totalWidth=qrPerRow*horizontalSpacing;
- const startX=(100-totalWidth)/2+5;
- const startY=7;
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({unit:"mm", format:[100,150]});
 
- let x=startX, y=startY;
- const qrPerPage=qrPerRow*qrPerColumn;
+  const qrSize = 20;           // QR dimension in mm
+  const textGap = 2;           // Space below QR
+  const fontSize = 6;          // Smaller serial ID
+  const marginX = 5;           // left/right margin
+  const marginY = 5;           // top margin
+  const spacingX = 25;         // horizontal spacing between QR
+  const spacingY = 27;         // vertical spacing between QR
 
- for(let i=1;i<=n;i++){
-   const id="ID"+String(++last).padStart(3,"0");
-   const c=document.createElement("canvas");
-   await QRCode.toCanvas(c,id,{width:150});
+  const qrPerRow = Math.floor((100 - 2*marginX) / spacingX);
+  const qrPerColumn = Math.floor((150 - 2*marginY) / spacingY);
+  const qrPerPage = qrPerRow * qrPerColumn;
 
-   pdf.addImage(c,"PNG",x,y,qrSize,qrSize);
-   pdf.setFontSize(6);
-   pdf.text(id,x+(qrSize/2),y+qrSize+2.5,{align:"center"});
+  let x = marginX;
+  let y = marginY;
 
-   x+=horizontalSpacing;
-   if(i%qrPerRow===0){ x=startX; y+=verticalSpacing; }
-   if(i%qrPerPage===0 && i<n){ pdf.addPage([100,150]); x=startX; y=startY; }
- }
+  for(let i=1; i<=n; i++){
+    const id = "ID" + String(++last).padStart(3,"0");  // ID format
 
- pdf.save("QR_Codes.pdf");
+    const c = document.createElement("canvas");
+    await QRCode.toCanvas(c, id, {width: qrSize*3}); // canvas pixel width bigger for quality
 
- // Update last printed number in Firestore
- await db.collection("settings").doc("qr").set({lastNumber:last});
+    pdf.addImage(c, "PNG", x, y, qrSize, qrSize);
+
+    pdf.setFontSize(fontSize);
+    pdf.text(id, x + qrSize/2, y + qrSize + textGap, {align:"center"});
+
+    x += spacingX;
+    if((i % qrPerRow) === 0){ x = marginX; y += spacingY; }
+    if((i % qrPerPage) === 0 && i < n){ pdf.addPage([100,150]); x = marginX; y = marginY; }
+  }
+
+  pdf.save("QR_Codes.pdf");
+
+  // Update last printed number in Firestore
+  await db.collection("settings").doc("qr").set({lastNumber:last});
 }
 </script>
 </body>

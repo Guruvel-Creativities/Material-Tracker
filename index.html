@@ -6,6 +6,8 @@
 <title>Guruvel Creativities Inventory</title>
 
 <script src="https://cdn.tailwindcss.com"></script>
+<!-- HTML5 QR Code Scanner - This was working -->
+<script src="https://unpkg.com/html5-qrcode"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
@@ -13,245 +15,25 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
-<!-- Simple QR Scanner Library - Pure JS, no dependencies -->
-<script>
-// Minimal QR Code decoder for ID### format
-class SimpleQRDecoder {
-    constructor() {
-        this.pattern = /ID\d+/i;
-    }
-    
-    // Try to detect QR code from image data
-    decodeFromImageData(imageData) {
-        const width = imageData.width;
-        const height = imageData.height;
-        const data = imageData.data;
-        
-        // Convert to grayscale and find contrast
-        let text = this.tryBrightnessPattern(data, width, height);
-        
-        // Try to find ID pattern
-        if (text && this.pattern.test(text)) {
-            return text.toUpperCase();
-        }
-        
-        return null;
-    }
-    
-    // Simple brightness pattern detection
-    tryBrightnessPattern(data, width, height) {
-        // Look for high contrast areas (QR codes have black/white pattern)
-        const sampleSize = 20;
-        let detectedText = '';
-        
-        // Sample points in a grid pattern
-        for (let y = 0; y < sampleSize; y++) {
-            for (let x = 0; x < sampleSize; x++) {
-                const px = Math.floor(x * width / sampleSize);
-                const py = Math.floor(y * height / sampleSize);
-                const idx = (py * width + px) * 4;
-                
-                // Get brightness
-                const brightness = (data[idx] + data[idx+1] + data[idx+2]) / 3;
-                
-                // Simple threshold to detect pattern
-                if (brightness < 128) {
-                    detectedText += '1';
-                } else {
-                    detectedText += '0';
-                }
-            }
-        }
-        
-        // Very basic pattern matching for "ID###"
-        if (detectedText.includes('111111')) { // Black bars pattern
-            return this.extractPossibleText(data, width, height);
-        }
-        
-        return null;
-    }
-    
-    // Try to extract text by sampling
-    extractPossibleText(data, width, height) {
-        // Sample center region
-        const centerX = Math.floor(width / 2);
-        const centerY = Math.floor(height / 2);
-        let result = '';
-        
-        // Simple OCR-like sampling for ID### pattern
-        for (let i = 0; i < 10; i++) {
-            const x = centerX - 100 + i * 20;
-            const y = centerY;
-            
-            if (x >= 0 && x < width) {
-                const idx = (y * width + x) * 4;
-                const brightness = (data[idx] + data[idx+1] + data[idx+2]) / 3;
-                
-                // Convert brightness to character (very basic)
-                if (brightness < 100) {
-                    result += 'I';
-                } else if (brightness < 150) {
-                    result += 'D';
-                } else if (brightness < 50) {
-                    result += Math.floor(Math.random() * 10); // Simulate number
-                }
-            }
-        }
-        
-        return result;
-    }
-    
-    // Alternative: Try to read text from OCR simulation
-    simulateOCR(imageData) {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        canvas.width = imageData.width;
-        canvas.height = imageData.height;
-        ctx.putImageData(imageData, 0, 0);
-        
-        // Draw text for debugging
-        ctx.fillStyle = 'white';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = 'black';
-        ctx.font = 'bold 40px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('SCAN SUCCESS', canvas.width/2, canvas.height/2);
-        
-        // This is where you would add real OCR
-        // For now, we'll use prompt for manual entry
-        return null;
-    }
-}
-</script>
-
 <style>
-    /* Scanner styles */
-    .scanner-container {
+    /* Simple scanner container */
+    #qr-reader {
         width: 100%;
         max-width: 400px;
-        height: 400px;
         margin: 0 auto;
-        position: relative;
-        overflow: hidden;
-        border-radius: 16px;
-        background: #000;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
     }
     
-    .scanner-video {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
+    #qr-reader video {
+        width: 100% !important;
+        height: auto !important;
+        border-radius: 12px;
     }
     
-    .scanner-overlay {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        pointer-events: none;
-    }
-    
-    .scan-area {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        width: 280px;
-        height: 280px;
-        border: 4px solid rgba(16, 185, 129, 0.8);
-        border-radius: 16px;
-        box-shadow: 0 0 0 1000px rgba(0, 0, 0, 0.7),
-                    inset 0 0 20px rgba(16, 185, 129, 0.3);
-    }
-    
-    .scan-line {
-        position: absolute;
-        width: 100%;
-        height: 4px;
-        background: linear-gradient(90deg, 
-            transparent, 
-            #10B981, 
-            #34D399, 
-            #10B981, 
-            transparent);
-        animation: scan 1.8s ease-in-out infinite;
-        border-radius: 2px;
-        box-shadow: 0 0 10px rgba(16, 185, 129, 0.8);
-    }
-    
-    @keyframes scan {
-        0% { top: 5%; opacity: 0.8; }
-        50% { top: 95%; opacity: 1; }
-        100% { top: 5%; opacity: 0.8; }
-    }
-    
-    /* Capture button */
-    .capture-btn {
-        width: 80px;
-        height: 80px;
-        border-radius: 50%;
-        background: white;
-        border: 6px solid #3B82F6;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        transition: all 0.2s;
-        box-shadow: 0 4px 20px rgba(59, 130, 246, 0.5);
-    }
-    
-    .capture-btn:hover {
-        transform: scale(1.05);
-        box-shadow: 0 6px 25px rgba(59, 130, 246, 0.6);
-    }
-    
-    .capture-btn:active {
-        transform: scale(0.95);
-    }
-    
-    .capture-inner {
-        width: 60px;
-        height: 60px;
-        border-radius: 50%;
-        background: #3B82F6;
-        transition: all 0.2s;
-    }
-    
-    .capture-btn:active .capture-inner {
-        background: #1D4ED8;
-    }
-    
-    /* Controls */
-    .control-btn {
-        width: 56px;
-        height: 56px;
-        border-radius: 50%;
-        border: none;
-        background: rgba(0, 0, 0, 0.7);
-        color: white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        transition: all 0.2s;
-        backdrop-filter: blur(10px);
-    }
-    
-    .control-btn:hover {
-        background: rgba(0, 0, 0, 0.9);
-        transform: scale(1.05);
-    }
-    
-    /* Status */
-    .scan-status {
-        padding: 8px 16px;
-        background: rgba(0, 0, 0, 0.7);
-        color: white;
-        border-radius: 20px;
+    .scanning-text {
+        text-align: center;
+        margin-top: 10px;
+        color: #4B5563;
         font-size: 14px;
-        backdrop-filter: blur(10px);
     }
 </style>
 </head>
@@ -260,135 +42,74 @@ class SimpleQRDecoder {
 <div class="max-w-4xl mx-auto">
 
 <!-- HEADER -->
-<div class="bg-white rounded-2xl shadow-xl p-6 mb-6">
+<div class="bg-white rounded-xl shadow-lg p-6 mb-6">
     <div class="flex items-center gap-4 mb-6">
-        <img class="w-20" src="https://raw.githubusercontent.com/Guruvel-Creativities/Material-Tracker/main/Logo.PNG" alt="Logo">
-        <h1 class="text-2xl font-bold text-gray-900">Guruvel Creativities Inventory</h1>
+        <img class="w-16 md:w-20" src="https://raw.githubusercontent.com/Guruvel-Creativities/Material-Tracker/main/Logo.PNG" alt="Logo">
+        <h1 class="text-xl md:text-2xl font-bold text-gray-900">Guruvel Creativities Inventory</h1>
     </div>
     
     <!-- ACTION BUTTONS -->
     <div class="flex flex-wrap gap-3 mb-4">
-        <button onclick="generateQR()" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition duration-200 shadow-md hover:shadow-lg">
+        <button onclick="generateQR()" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg">
             Generate QR
         </button>
-        <button onclick="startScanner('add')" class="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition duration-200 shadow-md hover:shadow-lg">
+        <button onclick="startScanner('add')" class="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg">
             Add Item
         </button>
-        <button onclick="startScanner('consume')" class="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl transition duration-200 shadow-md hover:shadow-lg">
+        <button onclick="startScanner('consume')" class="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg">
             Consume Item
         </button>
     </div>
     
     <!-- SEARCH -->
     <input id="searchInput" oninput="renderStock()" placeholder="🔍 Search materials..."
-        class="w-full p-4 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200">
+        class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
 </div>
 
 <!-- SCANNER SECTION -->
-<div id="scannerSection" class="hidden bg-white rounded-2xl shadow-xl p-6 mb-6">
-    <h2 class="text-xl font-bold text-gray-900 mb-4">
-        📸 Scanner - 
-        <span id="scanModeText">Add Mode</span>
-    </h2>
-    
-    <div class="scanner-container">
-        <video id="scannerVideo" class="scanner-video" playsinline autoplay></video>
-        <div class="scanner-overlay">
-            <div class="scan-area">
-                <div class="scan-line"></div>
-            </div>
-        </div>
-        
-        <!-- Status indicator -->
-        <div class="absolute top-4 left-1/2 transform -translate-x-1/2">
-            <div class="scan-status">
-                <span id="statusText">Ready to scan</span>
-            </div>
-        </div>
-        
-        <!-- Flash button -->
-        <div class="absolute bottom-4 left-4">
-            <button id="flashBtn" onclick="toggleFlash()" class="control-btn">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-            </button>
-        </div>
-        
-        <!-- Camera switch -->
-        <div class="absolute bottom-4 right-4">
-            <button onclick="switchCamera()" class="control-btn">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-            </button>
-        </div>
-    </div>
-    
-    <!-- Capture button -->
-    <div class="flex justify-center mt-8">
-        <div class="capture-btn" onclick="captureAndDecode()">
-            <div class="capture-inner"></div>
-        </div>
-    </div>
-    
-    <p class="text-center text-gray-600 mt-4">
-        Hold QR code steady in the frame and tap capture button
-    </p>
-    
-    <!-- Manual entry fallback -->
-    <div class="mt-6 text-center">
-        <button onclick="manualEntry()" class="px-4 py-2 text-blue-600 hover:text-blue-800 font-medium">
-            Or enter QR code manually →
-        </button>
+<div id="scannerSection" class="hidden bg-white rounded-xl shadow-lg p-6 mb-6">
+    <div id="qr-reader"></div>
+    <div class="scanning-text">
+        Point camera at QR code. It will scan automatically.
     </div>
     
     <div class="text-center mt-6">
-        <button onclick="stopScanner()" class="px-6 py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold rounded-xl">
+        <button onclick="stopScanner()" class="px-6 py-2.5 bg-yellow-500 hover:bg-yellow-600 text-white font-medium rounded-lg">
             Close Scanner
         </button>
     </div>
-    
-    <!-- Hidden canvas -->
-    <canvas id="processingCanvas" style="display: none;"></canvas>
 </div>
 
 <!-- STOCK DISPLAY -->
-<div class="bg-white rounded-2xl shadow-xl p-6 mb-6">
-    <div class="flex justify-between items-center mb-4">
-        <h2 class="text-xl font-bold text-gray-900">📦 Current Stock</h2>
-        <span id="stockCount" class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-semibold">
-            Loading...
-        </span>
-    </div>
-    <div id="stockList" class="space-y-3 max-h-96 overflow-y-auto pr-2">
+<div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+    <h2 class="text-lg md:text-xl font-bold text-gray-800 mb-4">📦 Current Stock</h2>
+    <div id="stockList" class="space-y-2 max-h-96 overflow-y-auto">
         <!-- Stock will load here -->
     </div>
 </div>
 
 <!-- EXPORT SECTION -->
-<div class="bg-white rounded-2xl shadow-xl p-6">
-    <h2 class="text-xl font-bold text-gray-900 mb-4">📊 Export History</h2>
+<div class="bg-white rounded-xl shadow-lg p-6">
+    <h2 class="text-lg md:text-xl font-bold text-gray-800 mb-4">📊 Export History</h2>
     
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
         <div class="relative">
-            <input type="date" id="fromDate" class="w-full p-3 pl-10 border-2 border-gray-200 rounded-xl">
-            <span class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">📅</span>
+            <input type="date" id="fromDate" class="w-full p-3 pl-10 border border-gray-300 rounded-lg">
+            <span class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">From</span>
         </div>
         
         <div class="relative">
-            <input type="date" id="toDate" class="w-full p-3 pl-10 border-2 border-gray-200 rounded-xl">
-            <span class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">📅</span>
+            <input type="date" id="toDate" class="w-full p-3 pl-10 border border-gray-300 rounded-lg">
+            <span class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">To</span>
         </div>
         
-        <select id="filterType" class="p-3 border-2 border-gray-200 rounded-xl">
+        <select id="filterType" class="p-3 border border-gray-300 rounded-lg">
             <option value="ALL">All Types</option>
             <option value="Add">Add Only</option>
             <option value="Consume">Consume Only</option>
         </select>
         
-        <button onclick="exportCSV()" class="p-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-xl">
+        <button onclick="exportCSV()" class="p-3 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg">
             Export CSV
         </button>
     </div>
@@ -408,16 +129,8 @@ const db = firebase.firestore();
 /* DATA STORAGE */
 let stock = {}, history = [];
 let currentScanMode = null;
-let videoStream = null;
-let currentFacingMode = 'environment';
-let isFlashOn = false;
-let isProcessing = false;
-let qrDecoder = null;
-
-/* INITIALIZE QR DECODER */
-function initQRDecoder() {
-    qrDecoder = new SimpleQRDecoder();
-}
+let html5QrCode = null;
+let isScanning = false;
 
 /* REALTIME DATA */
 db.collection("materials").onSnapshot(s => {
@@ -443,401 +156,118 @@ function renderStock() {
     });
     
     const stockList = document.getElementById("stockList");
-    const stockCount = document.getElementById("stockCount");
     const stockEntries = Object.entries(counted);
-    const totalItems = Object.values(counted).reduce((a, b) => a + b, 0);
-    
-    stockCount.textContent = `${totalItems} items`;
     
     if (stockEntries.length === 0) {
         stockList.innerHTML = `
-            <div class="text-center py-12">
-                <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                </svg>
-                <p class="text-gray-500">No materials found</p>
-                ${searchTerm ? '<p class="text-sm text-gray-400 mt-2">Try different search terms</p>' : ''}
+            <div class="text-center py-8 text-gray-500">
+                No materials found
             </div>`;
         return;
     }
     
     stockList.innerHTML = stockEntries.map(([material, count], index) => `
-        <div class="flex items-center justify-between p-4 border-2 border-gray-100 rounded-xl hover:bg-gray-50 transition duration-200">
-            <div class="flex items-center space-x-4">
-                <span class="flex items-center justify-center w-10 h-10 bg-blue-100 text-blue-800 rounded-xl font-bold text-lg">
+        <div class="flex justify-between items-center p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
+            <div class="flex items-center">
+                <span class="w-8 h-8 flex items-center justify-center bg-blue-100 text-blue-800 rounded-full mr-3 font-medium">
                     ${index + 1}
                 </span>
-                <span class="text-gray-900 font-medium">${material}</span>
+                <span class="text-gray-800">${material}</span>
             </div>
-            <span class="px-4 py-2 bg-green-100 text-green-800 rounded-xl font-bold text-lg">
+            <span class="bg-green-100 text-green-800 px-3 py-1 rounded-full font-medium">
                 ${count}
             </span>
         </div>
     `).join('');
 }
 
-/* UPDATE STATUS */
-function updateStatus(text, isSuccess = false) {
-    const statusText = document.getElementById('statusText');
-    statusText.textContent = text;
-    statusText.style.color = isSuccess ? '#10B981' : 'white';
-}
-
-/* HIGH QUALITY SCANNER */
+/* SIMPLE QR SCANNER - USING HTML5QRCODE */
 async function startScanner(mode) {
-    if (isProcessing) return;
+    if (isScanning) {
+        stopScanner();
+        setTimeout(() => startScanner(mode), 300);
+        return;
+    }
     
     currentScanMode = mode;
-    document.getElementById('scanModeText').textContent = 
-        mode === 'add' ? 'Add Mode' : 'Consume Mode';
     document.getElementById('scannerSection').classList.remove('hidden');
-    
-    initQRDecoder();
+    document.getElementById('qr-reader').innerHTML = '';
     
     try {
-        // Get highest quality camera
-        const constraints = {
-            video: {
-                facingMode: currentFacingMode,
-                width: { ideal: 1920, max: 3840 },
-                height: { ideal: 1080, max: 2160 },
-                frameRate: { ideal: 60 },
-                focusMode: 'continuous' // Auto-focus for QR codes
-            }
+        html5QrCode = new Html5Qrcode("qr-reader");
+        
+        // SIMPLE CONFIG THAT WORKS ON IPHONE
+        const config = {
+            fps: 10, // Lower FPS for better compatibility
+            qrbox: { 
+                width: 250, 
+                height: 250 
+            },
+            aspectRatio: 1.0,
+            disableFlip: false
         };
         
-        updateStatus("Starting camera...");
-        
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
-        videoStream = stream;
-        
-        const video = document.getElementById('scannerVideo');
-        video.srcObject = stream;
-        
-        // Wait for video to load
-        await new Promise(resolve => {
-            video.onloadedmetadata = () => {
-                video.play();
-                resolve();
-            };
-        });
-        
-        updateStatus("Ready - Position QR code in frame");
-        
-        // Try to set autofocus
-        try {
-            const track = stream.getVideoTracks()[0];
-            await track.applyConstraints({
-                advanced: [{ focusMode: 'continuous' }]
-            });
-        } catch (e) {
-            console.log("Auto-focus not supported");
-        }
-        
-    } catch (error) {
-        console.error("Camera error:", error);
-        updateStatus("Camera error");
-        
-        // Fallback to simple camera
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: currentFacingMode }
-            });
-            
-            videoStream = stream;
-            const video = document.getElementById('scannerVideo');
-            video.srcObject = stream;
-            video.play();
-            updateStatus("Ready - Position QR code");
-            
-        } catch (fallbackError) {
-            alert("❌ Camera access failed.\n\nPlease check:\n1. Camera permissions\n2. HTTPS connection\n3. Try refreshing");
-            stopScanner();
-        }
-    }
-}
-
-/* CAPTURE AND DECODE QR */
-async function captureAndDecode() {
-    if (isProcessing || !videoStream) return;
-    
-    isProcessing = true;
-    updateStatus("Processing image...");
-    
-    const video = document.getElementById('scannerVideo');
-    const canvas = document.getElementById('processingCanvas');
-    const ctx = canvas.getContext('2d');
-    
-    // Set canvas size to video resolution
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    
-    // Draw video frame to canvas
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    
-    // Get image data
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    
-    // Try to decode QR code
-    let decodedQR = null;
-    
-    try {
-        // Method 1: Try our simple decoder
-        decodedQR = qrDecoder.decodeFromImageData(imageData);
-        
-        // Method 2: If simple decoder fails, try pattern matching
-        if (!decodedQR) {
-            decodedQR = tryPatternDetection(imageData);
-        }
-        
-    } catch (error) {
-        console.error("QR decoding error:", error);
-    }
-    
-    // Show results
-    if (decodedQR) {
-        // QR detected automatically!
-        updateStatus("✓ QR Code Detected!", true);
-        
-        // Visual feedback
-        document.querySelector('.scan-line').style.background = 
-            'linear-gradient(90deg, transparent, #10B981, #10B981, #10B981, transparent)';
-        
-        // Vibrate if available
-        if (navigator.vibrate) navigator.vibrate([50, 50, 100]);
-        
-        // Process after short delay
-        setTimeout(() => {
-            processScannedCode(decodedQR);
-            isProcessing = false;
-        }, 500);
-        
-    } else {
-        // QR not detected, show image for manual entry
-        updateStatus("QR not auto-detected");
-        showImageForManualEntry(canvas);
-    }
-}
-
-/* TRY PATTERN DETECTION */
-function tryPatternDetection(imageData) {
-    const width = imageData.width;
-    const height = imageData.height;
-    const data = imageData.data;
-    
-    // Look for high contrast patterns (QR codes)
-    let blackPixels = 0;
-    let whitePixels = 0;
-    
-    // Sample center area
-    const centerX = Math.floor(width / 2);
-    const centerY = Math.floor(height / 2);
-    const sampleSize = 100;
-    
-    for (let y = centerY - sampleSize; y < centerY + sampleSize; y += 10) {
-        for (let x = centerX - sampleSize; x < centerX + sampleSize; x += 10) {
-            if (x >= 0 && x < width && y >= 0 && y < height) {
-                const idx = (y * width + x) * 4;
-                const brightness = (data[idx] + data[idx+1] + data[idx+2]) / 3;
-                
-                if (brightness < 100) blackPixels++;
-                else if (brightness > 200) whitePixels++;
+        // Start with minimal constraints
+        await html5QrCode.start(
+            { facingMode: "environment" }, // Use rear camera
+            config,
+            (decodedText) => {
+                // QR code detected!
+                handleScan(decodedText, mode);
+            },
+            (errorMessage) => {
+                // Ignore "No QR code found" errors
+                if (!errorMessage.includes("No QR code found")) {
+                    console.log("Scan error:", errorMessage);
+                }
             }
-        }
-    }
-    
-    // Check if we have enough contrast for a QR code
-    const totalPixels = (blackPixels + whitePixels);
-    if (totalPixels > 0) {
-        const contrastRatio = Math.max(blackPixels, whitePixels) / totalPixels;
+        );
         
-        if (contrastRatio > 0.3) {
-            // Good contrast detected, might be a QR code
-            // Since we can't decode it, return a prompt
-            return null;
-        }
-    }
-    
-    return null;
-}
-
-/* SHOW IMAGE FOR MANUAL ENTRY */
-function showImageForManualEntry(canvas) {
-    // Convert canvas to data URL
-    const imageUrl = canvas.toDataURL('image/jpeg', 0.9);
-    
-    // Create preview modal
-    const modalHTML = `
-        <div class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4">
-            <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full">
-                <div class="p-6 border-b">
-                    <h3 class="text-xl font-bold text-gray-900">📷 Captured Image</h3>
-                    <p class="text-gray-600 mt-2">Please enter the QR code manually</p>
-                </div>
-                
-                <div class="p-6">
-                    <div class="mb-4">
-                        <img src="${imageUrl}" class="w-full h-64 object-contain rounded-lg border-2 border-gray-200" 
-                             alt="Captured QR Code">
-                    </div>
-                    
-                    <div class="space-y-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">
-                                Enter QR Code (ID### format):
-                            </label>
-                            <input type="text" id="manualQRInput" 
-                                class="w-full p-4 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-lg font-mono"
-                                placeholder="Example: ID001"
-                                autofocus>
-                        </div>
-                        
-                        <div class="text-sm text-gray-500">
-                            <p>💡 Tip: Look at the image above to read the QR code</p>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="p-6 border-t flex justify-end gap-3">
-                    <button onclick="closeManualEntry()" 
-                        class="px-5 py-2.5 text-gray-600 hover:text-gray-800 font-medium">
-                        Cancel
-                    </button>
-                    <button onclick="submitManualQR()" 
-                        class="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl">
-                        Confirm QR Code
-                    </button>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    // Add modal to page
-    const modalDiv = document.createElement('div');
-    modalDiv.id = 'manualEntryModal';
-    modalDiv.innerHTML = modalHTML;
-    document.body.appendChild(modalDiv);
-    
-    // Focus input
-    setTimeout(() => {
-        const input = document.getElementById('manualQRInput');
-        if (input) input.focus();
-    }, 100);
-}
-
-/* MANUAL ENTRY FALLBACK */
-function manualEntry() {
-    const qrCode = prompt("Enter QR Code (ID### format):\n\nExample: ID001, ID123", "");
-    
-    if (qrCode && qrCode.trim()) {
-        processScannedCode(qrCode.trim());
-    }
-}
-
-/* SUBMIT MANUAL QR */
-function submitManualQR() {
-    const input = document.getElementById('manualQRInput');
-    const qrCode = input.value.trim();
-    
-    if (!qrCode) {
-        alert("Please enter a QR code");
-        return;
-    }
-    
-    if (!qrCode.match(/^ID\d+$/i)) {
-        alert("Invalid format. Please use ID followed by numbers (e.g., ID001)");
-        return;
-    }
-    
-    closeManualEntry();
-    processScannedCode(qrCode.toUpperCase());
-}
-
-/* CLOSE MANUAL ENTRY */
-function closeManualEntry() {
-    const modal = document.getElementById('manualEntryModal');
-    if (modal) {
-        modal.remove();
-    }
-    isProcessing = false;
-    updateStatus("Ready - Position QR code in frame");
-}
-
-/* TOGGLE FLASH */
-function toggleFlash() {
-    if (!videoStream) return;
-    
-    const videoTrack = videoStream.getVideoTracks()[0];
-    const flashBtn = document.getElementById('flashBtn');
-    
-    if (videoTrack && videoTrack.getCapabilities && videoTrack.getCapabilities().torch) {
-        isFlashOn = !isFlashOn;
+        isScanning = true;
         
-        videoTrack.applyConstraints({
-            advanced: [{ torch: isFlashOn }]
-        }).then(() => {
-            flashBtn.style.background = isFlashOn ? '#F59E0B' : 'rgba(0,0,0,0.7)';
-            flashBtn.style.color = isFlashOn ? '#000' : '#fff';
-        }).catch(console.error);
-    } else {
-        alert("Flash not available on this device");
+    } catch (error) {
+        console.error("Scanner error:", error);
+        alert("Camera access failed. Please check permissions and try again.");
+        stopScanner();
     }
 }
 
-/* SWITCH CAMERA */
-async function switchCamera() {
-    if (!videoStream) return;
-    
-    currentFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
-    updateStatus("Switching camera...");
-    
-    // Stop current stream
-    videoStream.getTracks().forEach(track => track.stop());
-    
-    // Start new stream
-    await startScanner(currentScanMode);
-}
-
-/* STOP SCANNER */
-function stopScanner() {
-    if (videoStream) {
-        videoStream.getTracks().forEach(track => track.stop());
-        videoStream = null;
+/* HANDLE SCAN RESULT */
+async function handleScan(serial, mode) {
+    // Stop scanner immediately
+    if (html5QrCode && isScanning) {
+        await html5QrCode.stop();
+        isScanning = false;
     }
     
-    const video = document.getElementById('scannerVideo');
-    video.srcObject = null;
-    
+    // Hide scanner
     document.getElementById('scannerSection').classList.add('hidden');
-    currentScanMode = null;
-    isProcessing = false;
-    updateStatus("Ready to scan");
-}
-
-/* PROCESS SCANNED CODE */
-async function processScannedCode(serial) {
+    
     serial = serial.trim().toUpperCase();
     
     // Validate format
-    if (!serial.match(/^ID\d+$/)) {
-        alert("❌ Invalid QR format\n\nMust be: ID followed by numbers\nExample: ID001, ID1234\n\nYou entered: " + serial);
+    if (!serial.startsWith("ID") || !/^ID\d+$/.test(serial)) {
+        alert(`Invalid QR code format.\n\nExpected: ID followed by numbers\nExample: ID001, ID123\n\nScanned: ${serial}`);
         return;
     }
     
-    if (currentScanMode === "add") {
+    if (mode === "add") {
+        // Check if exists
         if (stock[serial]) {
-            alert(`⚠️ Already Exists\n\nSerial: ${serial}\nMaterial: ${stock[serial]}\n\nThis item is already in stock.`);
+            alert(`Already exists!\n\nSerial: ${serial}\nMaterial: ${stock[serial]}`);
             return;
         }
         
-        const materialName = prompt(`📝 Enter Material Name\n\nFor QR Code: ${serial}\n\nMaterial Name:`, "");
+        // Get material name
+        const materialName = prompt(`Enter material name for:\n\n${serial}\n\nMaterial name:`, "");
         
         if (!materialName || !materialName.trim()) {
-            alert("Operation cancelled");
+            alert("Cancelled");
             return;
         }
         
         try {
+            // Save to database
             await db.collection("materials").doc(serial).set({ 
                 material: materialName.trim() 
             });
@@ -850,22 +280,23 @@ async function processScannedCode(serial) {
                 timestamp: firebase.firestore.FieldValue.serverTimestamp()
             });
             
-            alert(`✅ Added Successfully!\n\nMaterial: ${materialName.trim()}\nSerial: ${serial}`);
+            alert(`Added: ${materialName.trim()}\nSerial: ${serial}`);
             
         } catch (error) {
-            alert("❌ Database Error\n\n" + error.message);
+            alert("Error saving: " + error.message);
         }
     }
     
-    if (currentScanMode === "consume") {
+    if (mode === "consume") {
+        // Check if exists
         if (!stock[serial]) {
-            alert(`❌ Not Found\n\nSerial: ${serial}\n\nThis item is not in the inventory.`);
+            alert(`Not found!\n\nSerial: ${serial}\n\nNot in inventory.`);
             return;
         }
         
         const materialName = stock[serial];
         
-        if (confirm(`🗑️ Remove from inventory?\n\n${materialName}\nSerial: ${serial}`)) {
+        if (confirm(`Remove from inventory?\n\n${materialName}\nSerial: ${serial}`)) {
             try {
                 await db.collection("materials").doc(serial).delete();
                 
@@ -877,17 +308,33 @@ async function processScannedCode(serial) {
                     timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 });
                 
-                alert(`✅ Removed Successfully!\n\nMaterial: ${materialName}\nSerial: ${serial}`);
+                alert(`Removed: ${materialName}\nSerial: ${serial}`);
                 
             } catch (error) {
-                alert("❌ Database Error\n\n" + error.message);
+                alert("Error removing: " + error.message);
             }
         }
     }
     
-    // Close scanner and update
-    stopScanner();
+    // Update display
     renderStock();
+}
+
+/* STOP SCANNER */
+async function stopScanner() {
+    if (html5QrCode && isScanning) {
+        try {
+            await html5QrCode.stop();
+            html5QrCode.clear();
+        } catch (error) {
+            console.log("Error stopping scanner:", error);
+        }
+    }
+    
+    isScanning = false;
+    document.getElementById('scannerSection').classList.add('hidden');
+    document.getElementById('qr-reader').innerHTML = '';
+    currentScanMode = null;
 }
 
 /* EXPORT CSV */
@@ -918,7 +365,7 @@ function exportCSV() {
     
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(rows), "Inventory_Data");
-    XLSX.writeFile(workbook, `Inventory_History_${new Date().toISOString().split('T')[0]}.csv`);
+    XLSX.writeFile(workbook, `Inventory_History.csv`);
 }
 
 /* GENERATE QR PDF */
@@ -939,8 +386,6 @@ async function generateQR() {
     const spacingY = 7;
     
     let x = marginX, y = marginY, col = 0;
-    
-    alert(`🔄 Generating ${count} QR codes... Please wait.`);
     
     for (let i = 1; i <= count; i++) {
         const id = "ID" + String(++last).padStart(3, "0");
@@ -974,19 +419,12 @@ async function generateQR() {
     pdf.save(`QR_Codes_ID${String(last-count+1).padStart(3,'0')}_to_ID${String(last).padStart(3,'0')}.pdf`);
     await db.collection("settings").doc("qr").set({ lastNumber: last });
     
-    alert(`✅ Generated ${count} QR Codes!\n\nFrom: ID${String(last-count+1).padStart(3,'0')}\nTo: ID${String(last).padStart(3,'0')}`);
+    alert(`Generated ${count} QR codes\nFrom: ID${String(last-count+1).padStart(3,'0')}\nTo: ID${String(last).padStart(3,'0')}`);
 }
 
 /* CLEANUP */
 window.addEventListener('beforeunload', stopScanner);
 window.addEventListener('pagehide', stopScanner);
-
-// Close modal on escape
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-        closeManualEntry();
-    }
-});
 
 // Initialize
 renderStock();

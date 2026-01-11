@@ -25,6 +25,29 @@
         height: auto !important;
         object-fit: cover;
     }
+    
+    .zoom-controls {
+        position: absolute;
+        bottom: 10px;
+        right: 10px;
+        z-index: 100;
+    }
+    
+    .zoom-btn {
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        font-size: 20px;
+        cursor: pointer;
+        margin: 5px;
+    }
+    
+    .zoom-btn:hover {
+        background: rgba(0, 0, 0, 0.9);
+    }
 </style>
 </head>
 
@@ -50,11 +73,16 @@ class="w-full border p-2 rounded mb-4">
 
 <!-- CAMERA CONTAINER - Hidden by default -->
 <div id="cameraContainer" class="hidden mb-4">
-    <div id="reader" class="border-4 border-blue-500 rounded-lg overflow-hidden max-w-xs mx-auto relative"></div>
+    <div id="reader" class="border-4 border-blue-500 rounded-lg overflow-hidden max-w-xs mx-auto relative">
+        <div class="zoom-controls">
+            <button onclick="zoomIn()" class="zoom-btn">+</button>
+            <button onclick="zoomOut()" class="zoom-btn">-</button>
+        </div>
+    </div>
     <div id="cameraStatus" class="text-center text-sm text-gray-600 mt-1">
         <div class="inline-flex items-center gap-1">
             <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-            <span>Camera active - Scan QR code</span>
+            <span>Camera active - Move closer for small QR codes</span>
         </div>
     </div>
     <div class="text-center mt-2">
@@ -105,6 +133,7 @@ const db = firebase.firestore();
 
 /* DATA STORAGE */
 let stock={}, history=[], qr, currentScanMode = null, isProcessingScan = false;
+let currentZoom = 1;
 
 /* REALTIME MATERIAL DATA */
 db.collection("materials").onSnapshot(s=>{
@@ -128,7 +157,26 @@ function renderStock(){
  <span>${i+1}. ${m}</span><b>${n}</b></div>`).join("") || "<i>No match</i>";
 }
 
-/* CAMERA SCAN */
+/* ZOOM CONTROLS */
+function zoomIn() {
+    currentZoom = Math.min(currentZoom * 1.2, 3);
+    applyZoom();
+}
+
+function zoomOut() {
+    currentZoom = Math.max(currentZoom / 1.2, 1);
+    applyZoom();
+}
+
+function applyZoom() {
+    const videoElement = document.querySelector('#reader video');
+    if (videoElement) {
+        videoElement.style.transform = `scale(${currentZoom})`;
+        videoElement.style.transformOrigin = 'center center';
+    }
+}
+
+/* HIGH ACCURACY QR SCANNER */
 async function startScan(mode){
     if (isProcessingScan) {
         console.log("Already processing a scan, please wait...");
@@ -136,35 +184,85 @@ async function startScan(mode){
     }
     
     currentScanMode = mode;
+    currentZoom = 1;
     
     // Show camera container
     document.getElementById("cameraContainer").classList.remove("hidden");
     
     // Clear previous scanner
-    document.getElementById("reader").innerHTML = "";
+    document.getElementById("reader").innerHTML = '<div class="zoom-controls"><button onclick="zoomIn()" class="zoom-btn">+</button><button onclick="zoomOut()" class="zoom-btn">-</button></div>';
     
     try {
+        // Create scanner with high accuracy settings
         qr = new Html5Qrcode("reader");
         
+        // OPTIMIZED SETTINGS FOR SMALL QR CODES
         const config = {
-            fps: 25,
+            fps: 30,                    // Higher FPS for faster detection
             qrbox: { 
-                width: 250, 
-                height: 250 
+                width: 300,             // Larger scanning area
+                height: 300 
             },
             aspectRatio: 1.0,
-            disableFlip: false
+            disableFlip: false,
+            experimentalFeatures: {
+                useBarCodeDetectorIfSupported: true
+            },
+            rememberLastUsedCamera: true,
+            // Support multiple formats for better compatibility
+            formatsToSupport: [
+                Html5QrcodeSupportedFormats.QR_CODE,
+                Html5QrcodeSupportedFormats.AZTEC,
+                Html5QrcodeSupportedFormats.CODABAR,
+                Html5QrcodeSupportedFormats.CODE_39,
+                Html5QrcodeSupportedFormats.CODE_93,
+                Html5QrcodeSupportedFormats.CODE_128,
+                Html5QrcodeSupportedFormats.DATA_MATRIX,
+                Html5QrcodeSupportedFormats.MAXICODE,
+                Html5QrcodeSupportedFormats.ITF,
+                Html5QrcodeSupportedFormats.EAN_13,
+                Html5QrcodeSupportedFormats.EAN_8,
+                Html5QrcodeSupportedFormats.PDF_417,
+                Html5QrcodeSupportedFormats.RSS_14,
+                Html5QrcodeSupportedFormats.RSS_EXPANDED,
+                Html5QrcodeSupportedFormats.UPC_A,
+                Html5QrcodeSupportedFormats.UPC_E,
+                Html5QrcodeSupportedFormats.UPC_EAN_EXTENSION
+            ]
         };
         
+        // Get camera capabilities
+        const cameras = await Html5Qrcode.getCameras();
+        let cameraId = null;
+        
+        // Try to find the highest resolution camera (usually back camera)
+        if (cameras.length > 0) {
+            // Sort cameras by likely resolution (cameras with 'back' or high numbers in ID)
+            const sortedCameras = cameras.sort((a, b) => {
+                const aIsBack = a.label.toLowerCase().includes('back') || a.label.toLowerCase().includes('rear') || a.label.toLowerCase().includes('2') || a.label.includes('2');
+                const bIsBack = b.label.toLowerCase().includes('back') || b.label.toLowerCase().includes('rear') || b.label.toLowerCase().includes('2') || b.label.includes('2');
+                return (bIsBack ? 1 : 0) - (aIsBack ? 1 : 0);
+            });
+            cameraId = sortedCameras[0].id;
+        }
+        
+        console.log("Starting camera with high accuracy settings...");
+        
+        // Start with high resolution settings for better small QR detection
         await qr.start(
-            { facingMode: "environment" },
+            cameraId || { facingMode: "environment" },
             config,
             async (decodedText) => {
-                // Stop camera immediately when QR is detected
+                console.log("QR detected:", decodedText);
+                
+                // Beep sound for feedback
+                beep();
+                
+                // Stop camera immediately
                 try {
                     await qr.stop();
                 } catch (e) {
-                    // Ignore stop errors
+                    console.log("Error stopping:", e);
                 }
                 
                 // Hide camera container
@@ -174,41 +272,90 @@ async function startScan(mode){
                 await processScannedCode(decodedText, mode);
             },
             (errorMessage) => {
-                // Only log non-QR errors
-                if (!errorMessage.includes("No QR code found")) {
+                // Silently handle scanning errors
+                if (!errorMessage.includes("No QR code found") && 
+                    !errorMessage.includes("NotFoundException")) {
                     console.log("Scan error:", errorMessage);
                 }
+            }
+        ).then(() => {
+            console.log("Camera started successfully");
+            
+            // Add focus message after camera starts
+            setTimeout(() => {
+                const status = document.getElementById('cameraStatus');
+                if (status) {
+                    status.innerHTML = '<div class="inline-flex items-center gap-1"><div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div><span>✓ Camera ready - Move closer for small QR codes</span></div>';
+                }
+            }, 1000);
+            
+        }).catch(err => {
+            console.error("Camera start error:", err);
+            
+            // Fallback to simpler settings
+            startFallbackScan(mode);
+        });
+        
+    } catch (err) {
+        console.error("Initial camera start failed:", err);
+        startFallbackScan(mode);
+    }
+}
+
+/* FALLBACK SCANNER */
+async function startFallbackScan(mode) {
+    try {
+        qr = new Html5Qrcode("reader");
+        
+        await qr.start(
+            { facingMode: "environment" },
+            {
+                fps: 20,
+                qrbox: { width: 280, height: 280 },
+                aspectRatio: 1.0
+            },
+            async (decodedText) => {
+                beep();
+                try {
+                    await qr.stop();
+                } catch (e) {}
+                document.getElementById("cameraContainer").classList.add("hidden");
+                await processScannedCode(decodedText, mode);
             }
         );
         
     } catch (err) {
-        console.error("Camera start failed:", err);
-        
-        // Try simpler approach
-        try {
-            await qr.start(
-                null,
-                {
-                    fps: 20,
-                    qrbox: { width: 250, height: 250 }
-                },
-                async (decodedText) => {
-                    try {
-                        await qr.stop();
-                    } catch (e) {}
-                    document.getElementById("cameraContainer").classList.add("hidden");
-                    await processScannedCode(decodedText, mode);
-                }
-            );
-        } catch (err2) {
-            console.error("Fallback also failed:", err2);
-            alert("Could not access camera. Please check permissions.");
-            stopScan();
-        }
+        console.error("Fallback also failed:", err);
+        alert("Camera Error:\n\n1. Check camera permissions\n2. Ensure HTTPS is used\n3. Try a different browser\n\nError: " + err.message);
+        stopScan();
     }
 }
 
-/* PROCESS SCANNED CODE - SIMPLIFIED (NO CONFIRMATION PROMPTS) */
+/* BEEP SOUND FEEDBACK */
+function beep() {
+    try {
+        // Create a simple beep using Web Audio API
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.frequency.value = 1000;
+        oscillator.type = 'sine';
+        
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+        
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.1);
+    } catch (e) {
+        // Audio not supported, ignore
+    }
+}
+
+/* PROCESS SCANNED CODE */
 async function processScannedCode(serial, mode) {
     if (isProcessingScan) return;
     isProcessingScan = true;
@@ -300,6 +447,7 @@ async function processScannedCode(serial, mode) {
 /* STOP CAMERA */
 async function stopScan(){
     isProcessingScan = false;
+    currentZoom = 1;
     
     if(qr && qr.isScanning){
         try {
@@ -312,7 +460,7 @@ async function stopScan(){
     
     // Hide camera container
     document.getElementById("cameraContainer").classList.add("hidden");
-    document.getElementById("reader").innerHTML = "";
+    document.getElementById("reader").innerHTML = '<div class="zoom-controls"><button onclick="zoomIn()" class="zoom-btn">+</button><button onclick="zoomOut()" class="zoom-btn">-</button></div>';
     currentScanMode = null;
 }
 

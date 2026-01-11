@@ -142,7 +142,7 @@ function exportCSV(){
  }).forEach(h=>rows.push([h.serial,h.material,h.type,new Date(h.date.seconds*1000).toLocaleString()]));
 
  const wb=XLSX.utils.book_new();
- XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),"History");
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),"Inventory_History");
  XLSX.writeFile(wb,"Inventory_History.csv");
 }
 
@@ -169,3 +169,4 @@ async function generateQR(){
 </script>
 </body>
 </html>
+

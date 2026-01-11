@@ -142,11 +142,11 @@ function exportCSV(){
  }).forEach(h=>rows.push([h.serial,h.material,h.type,new Date(h.date.seconds*1000).toLocaleString()]));
 
  const wb=XLSX.utils.book_new();
- XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),"Inventory_History");
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),"Inventory_Data");
  XLSX.writeFile(wb,"Inventory_History.csv");
 }
 
-/* GENERATE QR PDF (100×150 mm) */
+/* GENERATE QR PDF (150mm×100mm) - 5x5 grid (25 per page) */
 async function generateQR(){
  const n=parseInt(prompt("Number of QR codes?")); if(!n) return;
  let last=0;
@@ -155,18 +155,48 @@ async function generateQR(){
 
  const {jsPDF}=window.jspdf;
  const pdf=new jsPDF({unit:"mm",format:[100,150]});
- let x=10,y=10;
+ 
+ let page=1;
+ let x=5; // Start 5mm from left
+ let y=5; // Start 5mm from top
+ const qrSize=15; // QR size 15mm
+ const spacingX=18; // Horizontal spacing (including QR + space)
+ const spacingY=18; // Vertical spacing (including QR + space)
+ const qrPerPage=25; // 5 rows × 5 columns
+ const qrPerRow=5;
+ 
  for(let i=1;i<=n;i++){
-  const id="ID"+String(++last).padStart(3,"0");
-  const c=document.createElement("canvas");
-  await QRCode.toCanvas(c,id,{width:120});
-  pdf.addImage(c,"PNG",x,y,25,25);
-  pdf.text(id,x+12.5,y+30,{align:"center"});
-  x+=30; if(x>70){x=10;y+=40;}
+   const id="ID"+String(++last).padStart(3,"0");
+   const c=document.createElement("canvas");
+   await QRCode.toCanvas(c,id,{width:120});
+   
+   // Add QR code
+   pdf.addImage(c,"PNG",x,y,qrSize,qrSize);
+   
+   // Add ID text below QR (smaller text)
+   pdf.setFontSize(6);
+   pdf.text(id,x+(qrSize/2),y+qrSize+2,{align:"center"});
+   
+   // Move to next column
+   x+=spacingX;
+   
+   // Check if we need to move to next row
+   if(i%qrPerRow===0){
+     x=5;
+     y+=spacingY;
+   }
+   
+   // Check if we need a new page
+   if(i%qrPerPage===0 && i<n){
+     pdf.addPage([100,150]); // Add new page with same dimensions
+     page++;
+     x=5;
+     y=5;
+   }
  }
- pdf.save("QR_100x150.pdf");
+ 
+ pdf.save("QR_Codes.pdf");
 }
 </script>
 </body>
 </html>
-

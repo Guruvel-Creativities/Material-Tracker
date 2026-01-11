@@ -129,80 +129,125 @@
       });
     }
     async function generateMultipleQRCodes() {
-  // Get quantity from user
-  const count = parseInt(prompt("How many QR codes to generate?", "10"));
-  if (isNaN(count) || count <= 0) return alert("Invalid number");
+    // Get quantity from user
+    const count = parseInt(prompt("How many QR codes to generate?", "10"));
+    if (isNaN(count) || count <= 0) return alert("Invalid number");
 
-  // Show loading indicator
-  const loading = document.createElement('div');
-  loading.style.position = 'fixed';
-  loading.style.top = '0';
-  loading.style.left = '0';
-  loading.style.width = '100%';
-  loading.style.height = '100%';
-  loading.style.backgroundColor = 'rgba(0,0,0,0.7)';
-  loading.style.color = 'white';
-  loading.style.display = 'flex';
-  loading.style.justifyContent = 'center';
-  loading.style.alignItems = 'center';
-  loading.style.zIndex = '1000';
-  loading.innerHTML = '<div style="font-size:24px">Generating QR codes...</div>';
-  document.body.appendChild(loading);
+    // Get material name
+    const materialName = prompt("Enter material name for these QR codes:");
+    if (!materialName) return;
 
-  try {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({
-      unit: 'mm',
-      format: [100, 150], // 100mm x 150mm paper
-      hotfixes: ["px_scaling"] // Fix PDF scaling
-    });
+    // Initialize lastSerialNum if not exists
+    if (typeof window.lastSerialNum === 'undefined') {
+        window.lastSerialNum = 0;
+    }
 
-    // Page layout calculations
-    const qrSize = 16; // 20mm x 20mm QR codes
-    const cols = 4;    // 4 per row
-    const xMargin = (100 - (cols * qrSize)) / (cols + 1); // Equal left/right margins
-    const yMargin = 10; // Top margin
-    const ySpacing = 8; // Vertical space between QR rows
-    const textHeight = 5; // Space for serial text
-    const rowsPerPage = Math.floor((150 - yMargin - textHeight) / (qrSize + ySpacing));
+    // Show loading indicator
+    const loading = document.createElement('div');
+    loading.style.position = 'fixed';
+    loading.style.top = '0';
+    loading.style.left = '0';
+    loading.style.width = '100%';
+    loading.style.height = '100%';
+    loading.style.backgroundColor = 'rgba(0,0,0,0.7)';
+    loading.style.color = 'white';
+    loading.style.display = 'flex';
+    loading.style.justifyContent = 'center';
+    loading.style.alignItems = 'center';
+    loading.style.zIndex = '1000';
+    loading.innerHTML = '<div style="font-size:24px">Generating QR codes...</div>';
+    document.body.appendChild(loading);
 
-    let currentPage = 0;
-    let positionOnPage = 0;
+    try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({
+            unit: 'mm',
+            format: [100, 150], // 100mm x 150mm paper
+            hotfixes: ["px_scaling"] // Fix PDF scaling
+        });
 
-    for (let i = 0; i < count; i++) {
-      const serial = "ID" + (++lastSerialNum).toString().padStart(3, '0');
-      
-      // Calculate position
-      const row = Math.floor(positionOnPage / cols);
-      const col = positionOnPage % cols;
-      const x = xMargin + col * (qrSize + xMargin);
-      const y = yMargin + row * (qrSize + ySpacing);
+        // Page layout calculations
+        const qrSize = 16; // QR code size in mm
+        const cols = 4;    // 4 per row
+        const xMargin = (100 - (cols * qrSize)) / (cols + 1); // Equal left/right margins
+        const yMargin = 10; // Top margin
+        const ySpacing = 8; // Vertical space between QR rows
+        const textHeight = 5; // Space for serial text
+        const rowsPerPage = Math.floor((150 - yMargin - textHeight) / (qrSize + ySpacing));
 
-      // Generate QR code
-      const qrCanvas = document.createElement('canvas');
-      await new Promise(resolve => {
-        QRCode.toCanvas(qrCanvas, serial, {
-          width: qrSize * 5, // High resolution (5 pixels per mm)
-          margin: 0,
-          color: { dark: '#000000', light: '#ffffff00' }
-        }, resolve);
-      });
+        let currentPage = 0;
+        let positionOnPage = 0;
+        const generatedSerials = [];
 
-      // Add to PDF
-      doc.addImage(qrCanvas, 'PNG', x, y, qrSize, qrSize);
-      
-      // Add serial text (centered below QR)
-      doc.setFontSize(14);
-      doc.text(serial, x + qrSize/2, y + qrSize + 5, { align: 'center' });
+        for (let i = 0; i < count; i++) {
+            const serial = "ID" + (++window.lastSerialNum).toString().padStart(3, '0');
+            generatedSerials.push({ serial, material: materialName });
+            
+            // Calculate position
+            const row = Math.floor(positionOnPage / cols);
+            const col = positionOnPage % cols;
+            const x = xMargin + col * (qrSize + xMargin);
+            const y = yMargin + row * (qrSize + ySpacing);
 
-      positionOnPage++;
-      
-      // New page if needed
-      if (positionOnPage >= cols * rowsPerPage && i < count - 1) {
-        doc.addPage([100, 150]);
-        positionOnPage = 0;
-        currentPage++;
-      }
+            // Generate QR code
+            const qrCanvas = document.createElement('canvas');
+            await new Promise(resolve => {
+                QRCode.toCanvas(qrCanvas, serial, {
+                    width: qrSize * 5, // High resolution (5 pixels per mm)
+                    margin: 1,
+                    color: { dark: '#000000', light: '#ffffff' }
+                }, resolve);
+            });
+
+            // Add to PDF
+            doc.addImage(qrCanvas, 'PNG', x, y, qrSize, qrSize);
+            
+            // Add serial text (centered below QR)
+            doc.setFontSize(10);
+            doc.text(serial, x + qrSize/2, y + qrSize + 4, { align: 'center' });
+            
+            // Add material name (smaller font)
+            doc.setFontSize(6);
+            doc.text(materialName.substring(0, 20), x + qrSize/2, y + qrSize + 7, { align: 'center' });
+
+            positionOnPage++;
+            
+            // New page if needed
+            if (positionOnPage >= cols * rowsPerPage && i < count - 1) {
+                doc.addPage([100, 150]);
+                positionOnPage = 0;
+                currentPage++;
+            }
+        }
+
+        // Save PDF
+        doc.save(`QR_Codes_${materialName}_${count}.pdf`);
+        
+        // Remove loading indicator
+        document.body.removeChild(loading);
+        
+        // Ask if user wants to add to database
+        if (confirm(`Generated ${count} QR codes for "${materialName}". Add these items to inventory?`)) {
+            for (const item of generatedSerials) {
+                await dbFirebase.collection("materials").doc(item.serial).set({ 
+                    material: item.material 
+                });
+                await dbFirebase.collection("history").add({
+                    serial: item.serial,
+                    material: item.material,
+                    type: "Add",
+                    date: new Date()
+                });
+            }
+            alert(`${count} items added to inventory!`);
+        }
+
+    } catch (error) {
+        console.error("Error generating QR codes:", error);
+        alert("Error generating QR codes: " + error.message);
+        document.body.removeChild(loading);
+    }
+}
     function startScan(mode) {
       document.getElementById("reader").innerHTML = "";
       document.getElementById("backButton").classList.remove("hidden");
@@ -320,4 +365,5 @@
   </script>
 </body>
 </html>
+
 

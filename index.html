@@ -14,172 +14,193 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
 <style>
-    .camera-preview {
+    /* Simple scanner styles */
+    .scanner-container {
         width: 100%;
-        max-width: 320px;
-        height: 320px;
+        max-width: 400px;
+        height: 400px;
         margin: 0 auto;
-        background: #000;
-        border-radius: 12px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
         position: relative;
         overflow: hidden;
+        border-radius: 12px;
+        background: #000;
     }
     
-    .camera-preview video {
+    .scanner-video {
         width: 100%;
         height: 100%;
         object-fit: cover;
     }
     
-    .scan-frame {
+    .scanner-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+    }
+    
+    .scan-area {
         position: absolute;
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        width: 70%;
-        height: 70%;
+        width: 280px;
+        height: 280px;
         border: 3px solid #10B981;
-        border-radius: 8px;
+        border-radius: 12px;
         box-shadow: 0 0 0 1000px rgba(0, 0, 0, 0.5);
     }
     
-    .camera-placeholder {
-        color: white;
-        text-align: center;
-        padding: 20px;
+    .scan-line {
+        position: absolute;
+        width: 100%;
+        height: 4px;
+        background: linear-gradient(90deg, transparent, #10B981, transparent);
+        animation: scan 1.5s ease-in-out infinite;
+        border-radius: 2px;
     }
     
-    .camera-placeholder svg {
-        width: 64px;
-        height: 64px;
-        margin-bottom: 12px;
-        opacity: 0.7;
+    @keyframes scan {
+        0% { top: 10%; }
+        50% { top: 90%; }
+        100% { top: 10%; }
     }
     
-    /* Hidden file input for iOS camera */
-    .camera-input {
-        display: none;
-    }
-    
-    /* Capture button */
-    .capture-btn {
-        width: 70px;
-        height: 70px;
+    /* Controls */
+    .control-btn {
+        width: 60px;
+        height: 60px;
         border-radius: 50%;
-        background: white;
-        border: 4px solid #3B82F6;
+        border: none;
+        background: rgba(0, 0, 0, 0.7);
+        color: white;
         display: flex;
         align-items: center;
         justify-content: center;
         cursor: pointer;
-        margin: 20px auto;
         transition: all 0.2s;
     }
     
-    .capture-btn:active {
-        transform: scale(0.95);
-        background: #E5E7EB;
+    .control-btn:hover {
+        background: rgba(0, 0, 0, 0.9);
+        transform: scale(1.05);
     }
     
-    .capture-inner {
-        width: 50px;
-        height: 50px;
-        border-radius: 50%;
-        background: #3B82F6;
+    .control-btn:active {
+        transform: scale(0.95);
+    }
+    
+    .flash-on {
+        background: #F59E0B;
+        color: #000;
     }
 </style>
 </head>
 
-<body class="bg-gray-100 p-4">
-<div class="max-w-3xl mx-auto bg-white rounded-xl shadow-lg p-4 md:p-6">
+<body class="bg-gray-100 min-h-screen p-4">
+<div class="max-w-4xl mx-auto">
 
 <!-- HEADER -->
-<div class="flex items-center gap-4 mb-4">
-<img class="w-16 md:w-20" src="https://raw.githubusercontent.com/Guruvel-Creativities/Material-Tracker/main/Logo.PNG" alt="Guruvel Creativities Logo">
-<h1 class="text-xl md:text-2xl font-bold">Guruvel Creativities Inventory</h1>
-</div>
-
-<!-- MAIN BUTTONS -->
-<div class="flex flex-wrap gap-2 mb-4">
-<button onclick="generateQR()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition">Generate QR</button>
-<button onclick="startAddScan()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition">Add</button>
-<button onclick="startConsumeScan()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition">Consume</button>
-</div>
-
-<!-- MATERIAL SEARCH -->
-<input id="searchInput" oninput="renderStock()" placeholder="🔍 Search material..."
-class="w-full border border-gray-300 p-3 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500">
-
-<!-- CAMERA SECTION - SIMPLE & RELIABLE -->
-<div id="cameraSection" class="hidden mb-6">
-    <div class="camera-preview">
-        <div id="cameraPlaceholder" class="camera-placeholder">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-            <p>Click capture button below</p>
-            <p class="text-sm opacity-80 mt-2">This will open your camera</p>
-        </div>
-        <video id="cameraVideo" autoplay playsinline></video>
-        <div class="scan-frame"></div>
+<div class="bg-white rounded-xl shadow-lg p-4 md:p-6 mb-6">
+    <div class="flex items-center gap-4 mb-4">
+        <img class="w-16 md:w-20" src="https://raw.githubusercontent.com/Guruvel-Creativities/Material-Tracker/main/Logo.PNG" alt="Logo">
+        <h1 class="text-xl md:text-2xl font-bold text-gray-800">Guruvel Creativities Inventory</h1>
     </div>
     
-    <div class="text-center">
-        <div class="capture-btn" onclick="capturePhoto()">
-            <div class="capture-inner"></div>
-        </div>
-        <p class="text-sm text-gray-600 mb-2">Tap to capture QR code photo</p>
-        
-        <button onclick="stopCamera()" class="bg-yellow-500 hover:bg-yellow-600 text-white px-6 py-2 rounded-lg">
-            Cancel
+    <!-- ACTION BUTTONS -->
+    <div class="flex flex-wrap gap-3 mb-4">
+        <button onclick="generateQR()" class="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition duration-200">
+            Generate QR
+        </button>
+        <button onclick="startScanner('add')" class="px-5 py-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition duration-200">
+            Add Item
+        </button>
+        <button onclick="startScanner('consume')" class="px-5 py-3 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition duration-200">
+            Consume Item
         </button>
     </div>
     
-    <!-- Hidden file input for iOS camera -->
-    <input type="file" id="cameraInput" accept="image/*" capture="environment" class="camera-input">
-    <canvas id="qrCanvas" style="display: none;"></canvas>
+    <!-- SEARCH -->
+    <input id="searchInput" oninput="renderStock()" placeholder="🔍 Search materials..."
+        class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+</div>
+
+<!-- SCANNER SECTION -->
+<div id="scannerSection" class="hidden bg-white rounded-xl shadow-lg p-4 md:p-6 mb-6">
+    <div class="scanner-container">
+        <video id="scannerVideo" class="scanner-video" playsinline></video>
+        <div class="scanner-overlay">
+            <div class="scan-area">
+                <div class="scan-line"></div>
+            </div>
+        </div>
+    </div>
     
-    <div class="mt-4 text-center text-sm text-gray-600">
-        <p>📱 <strong>iPhone Tip:</strong> Tap capture, take photo of QR code</p>
+    <div class="flex justify-center gap-4 mt-6">
+        <button id="flashBtn" onclick="toggleFlash()" class="control-btn">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+        </button>
+        
+        <button onclick="captureFrame()" class="control-btn bg-blue-600">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10" stroke-width="3"/>
+                <circle cx="12" cy="12" r="3" stroke-width="3"/>
+            </svg>
+        </button>
+        
+        <button onclick="switchCamera()" class="control-btn">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+        </button>
+    </div>
+    
+    <div class="text-center mt-4">
+        <button onclick="stopScanner()" class="px-6 py-2.5 bg-yellow-500 hover:bg-yellow-600 text-white font-medium rounded-lg">
+            Close Scanner
+        </button>
+        <p class="text-sm text-gray-600 mt-2">Hold QR code steady in the frame and tap capture</p>
+    </div>
+    
+    <!-- Hidden canvas for processing -->
+    <canvas id="processingCanvas" style="display: none;"></canvas>
+</div>
+
+<!-- STOCK DISPLAY -->
+<div class="bg-white rounded-xl shadow-lg p-4 md:p-6 mb-6">
+    <h2 class="text-lg md:text-xl font-bold text-gray-800 mb-4">📦 Current Stock</h2>
+    <div id="stockList" class="space-y-2 max-h-96 overflow-y-auto">
+        <!-- Stock will load here -->
     </div>
 </div>
 
-<!-- STOCK -->
-<div class="mt-6 bg-gray-50 p-4 rounded-lg">
-<h2 class="font-semibold mb-3 text-lg">Current Stock</h2>
-<div id="stockList" class="max-h-60 overflow-y-auto">
-    <div class="text-center py-8">
-        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        <p class="mt-2 text-gray-500">Loading stock...</p>
-    </div>
-</div>
-</div>
-
-<!-- EXPORT HISTORY -->
-<div class="mt-6 bg-gray-50 p-4 rounded-lg">
-    <h2 class="font-semibold mb-3 text-lg">Export History</h2>
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+<!-- EXPORT SECTION -->
+<div class="bg-white rounded-xl shadow-lg p-4 md:p-6">
+    <h2 class="text-lg md:text-xl font-bold text-gray-800 mb-4">📊 Export History</h2>
+    
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
         <div class="relative">
-            <label class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">From:</label>
-            <input type="date" id="fromDate" class="border border-gray-300 p-3 rounded-lg pl-16 w-full text-sm">
+            <input type="date" id="fromDate" class="w-full p-3 pl-10 border border-gray-300 rounded-lg">
+            <span class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">📅</span>
         </div>
         
         <div class="relative">
-            <label class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">To:</label>
-            <input type="date" id="toDate" class="border border-gray-300 p-3 rounded-lg pl-12 w-full text-sm">
+            <input type="date" id="toDate" class="w-full p-3 pl-10 border border-gray-300 rounded-lg">
+            <span class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">📅</span>
         </div>
         
-        <select id="filterType" class="border border-gray-300 p-3 rounded-lg text-sm">
+        <select id="filterType" class="p-3 border border-gray-300 rounded-lg">
             <option value="ALL">All Types</option>
             <option value="Add">Add Only</option>
             <option value="Consume">Consume Only</option>
         </select>
         
-        <button onclick="exportCSV()" class="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-4 font-medium">
+        <button onclick="exportCSV()" class="p-3 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg">
             Export CSV
         </button>
     </div>
@@ -199,10 +220,12 @@ const db = firebase.firestore();
 /* DATA STORAGE */
 let stock = {}, history = [];
 let currentScanMode = null;
+let videoStream = null;
+let currentFacingMode = 'environment';
+let isFlashOn = false;
 let isProcessing = false;
-let mediaStream = null;
 
-/* REALTIME MATERIAL DATA */
+/* REALTIME DATA */
 db.collection("materials").onSnapshot(s => {
     stock = {}; 
     s.forEach(d => stock[d.id] = d.data().material); 
@@ -225,282 +248,311 @@ function renderStock() {
         }
     });
     
+    const stockList = document.getElementById("stockList");
     const stockEntries = Object.entries(counted);
     
     if (stockEntries.length === 0) {
-        document.getElementById("stockList").innerHTML = `
+        stockList.innerHTML = `
             <div class="text-center py-8">
-                <p class="text-gray-500">No materials found</p>
-                ${searchTerm ? '<p class="text-sm text-gray-400 mt-1">Try a different search term</p>' : ''}
+                <svg class="w-12 h-12 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                </svg>
+                <p class="mt-2 text-gray-600">No materials found</p>
+                ${searchTerm ? '<p class="text-sm text-gray-500">Try different search terms</p>' : ''}
             </div>`;
         return;
     }
     
-    const stockListHTML = stockEntries.map(([material, count], index) => `
-        <div class="flex justify-between items-center border-b border-gray-200 py-3 px-2 hover:bg-gray-100">
-            <div class="flex items-center">
-                <span class="bg-blue-100 text-blue-800 text-xs font-semibold mr-3 px-2.5 py-0.5 rounded">${index + 1}</span>
+    stockList.innerHTML = stockEntries.map(([material, count], index) => `
+        <div class="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
+            <div class="flex items-center space-x-3">
+                <span class="flex items-center justify-center w-8 h-8 bg-blue-100 text-blue-800 rounded-full font-semibold">
+                    ${index + 1}
+                </span>
                 <span class="text-gray-800">${material}</span>
             </div>
-            <span class="bg-green-100 text-green-800 text-sm font-semibold px-3 py-1 rounded-full">${count}</span>
+            <span class="px-3 py-1 bg-green-100 text-green-800 rounded-full font-semibold">
+                ${count}
+            </span>
         </div>
     `).join('');
+}
+
+/* HIGH QUALITY NATIVE SCANNER */
+async function startScanner(mode) {
+    if (isProcessing) return;
     
-    document.getElementById("stockList").innerHTML = stockListHTML;
-}
-
-/* SIMPLE CAMERA METHODS FOR iOS */
-function startAddScan() {
-    currentScanMode = 'add';
-    showCamera();
-}
-
-function startConsumeScan() {
-    currentScanMode = 'consume';
-    showCamera();
-}
-
-function showCamera() {
-    document.getElementById('cameraSection').classList.remove('hidden');
+    currentScanMode = mode;
+    document.getElementById('scannerSection').classList.remove('hidden');
     
-    // Try to start camera preview (optional)
-    startCameraPreview();
-}
-
-function startCameraPreview() {
-    // This is optional - if it fails, we still have photo capture
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        navigator.mediaDevices.getUserMedia({ 
-            video: { 
-                facingMode: 'environment',
-                width: { ideal: 1280 },
-                height: { ideal: 720 }
-            } 
-        })
-        .then(function(stream) {
-            mediaStream = stream;
-            const video = document.getElementById('cameraVideo');
-            video.srcObject = stream;
-            video.style.display = 'block';
-            document.getElementById('cameraPlaceholder').style.display = 'none';
-        })
-        .catch(function(err) {
-            console.log("Camera preview not available, using photo capture only");
-            // This is OK - we'll use photo capture instead
+    try {
+        // Get camera with best quality for iPhone
+        const constraints = {
+            video: {
+                facingMode: currentFacingMode,
+                width: { ideal: 1920, max: 3840 }, // High resolution for small QR codes
+                height: { ideal: 1080, max: 2160 },
+                frameRate: { ideal: 60, max: 120 } // High FPS for smooth scanning
+            }
+        };
+        
+        // Try to get the best camera
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        videoStream = stream;
+        
+        const video = document.getElementById('scannerVideo');
+        video.srcObject = stream;
+        
+        // Wait for video to be ready
+        await new Promise(resolve => {
+            video.onloadedmetadata = () => {
+                video.play();
+                resolve();
+            };
         });
+        
+        console.log("Scanner started with high quality settings");
+        
+    } catch (error) {
+        console.error("Camera error:", error);
+        
+        // Try with simpler constraints if high quality fails
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: currentFacingMode
+                }
+            });
+            
+            videoStream = stream;
+            const video = document.getElementById('scannerVideo');
+            video.srcObject = stream;
+            video.play();
+            
+        } catch (fallbackError) {
+            alert("Camera access failed. Please check permissions and try again.");
+            stopScanner();
+        }
     }
 }
 
-function capturePhoto() {
-    if (isProcessing) return;
+/* CAPTURE AND PROCESS FRAME */
+async function captureFrame() {
+    if (isProcessing || !videoStream) return;
+    
     isProcessing = true;
-    
-    // On iOS, use the file input to open native camera
-    const fileInput = document.getElementById('cameraInput');
-    
-    // Set up the change event handler
-    fileInput.onchange = async function(event) {
-        const file = event.target.files[0];
-        if (!file) {
-            isProcessing = false;
-            return;
-        }
-        
-        try {
-            // Create an image from the file
-            const img = new Image();
-            const imgUrl = URL.createObjectURL(file);
-            
-            img.onload = async function() {
-                try {
-                    // Process the image for QR code
-                    await processCapturedImage(img);
-                    URL.revokeObjectURL(imgUrl);
-                } catch (error) {
-                    console.error("Error processing image:", error);
-                    alert("Could not read QR code from image. Please try again.");
-                } finally {
-                    isProcessing = false;
-                    fileInput.value = ''; // Reset input
-                }
-            };
-            
-            img.onerror = function() {
-                alert("Error loading image. Please try again.");
-                isProcessing = false;
-                fileInput.value = '';
-                URL.revokeObjectURL(imgUrl);
-            };
-            
-            img.src = imgUrl;
-            
-        } catch (error) {
-            console.error("Error capturing photo:", error);
-            alert("Error accessing camera. Please try again.");
-            isProcessing = false;
-            fileInput.value = '';
-        }
-    };
-    
-    // Trigger the file input click
-    fileInput.click();
-}
-
-async function processCapturedImage(img) {
-    // Create canvas to process image
-    const canvas = document.getElementById('qrCanvas');
+    const video = document.getElementById('scannerVideo');
+    const canvas = document.getElementById('processingCanvas');
     const ctx = canvas.getContext('2d');
     
-    // Set canvas size to match image
-    canvas.width = img.width;
-    canvas.height = img.height;
-    ctx.drawImage(img, 0, 0);
+    // Set canvas to video dimensions for high quality capture
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    
+    // Draw video frame to canvas
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     
     // Get image data
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     
-    // Try to find QR code in the image
-    // Note: For production, you would use a QR library here
-    // Since we're generating simple "ID###" codes, we can try basic detection
-    
-    // For now, show the image and ask user to confirm
-    showImagePreview(canvas);
-}
-
-function showImagePreview(canvas) {
-    // Stop camera preview if active
-    stopCameraPreview();
-    
-    // Convert canvas to data URL
-    const imageDataUrl = canvas.toDataURL('image/jpeg');
-    
     // Show preview and ask for QR code
-    const qrContent = prompt(
-        `📸 Photo captured!\n\n` +
-        `If QR code was detected automatically, it would appear here.\n\n` +
-        `Please enter the QR code content (ID### format):\n` +
-        `Example: ID001, ID002, etc.`,
-        ""
-    );
+    await showCapturePreview(canvas);
     
-    if (qrContent && qrContent.trim()) {
-        processScannedCode(qrContent.trim());
+    isProcessing = false;
+}
+
+/* SHOW CAPTURE PREVIEW */
+async function showCapturePreview(canvas) {
+    // Convert canvas to blob for preview
+    canvas.toBlob(async (blob) => {
+        const imageUrl = URL.createObjectURL(blob);
+        
+        // Create preview modal
+        const previewHTML = `
+            <div class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+                <div class="bg-white rounded-xl shadow-2xl max-w-md w-full">
+                    <div class="p-4 border-b">
+                        <h3 class="text-lg font-semibold">📸 Captured Image</h3>
+                    </div>
+                    
+                    <div class="p-4">
+                        <img src="${imageUrl}" class="w-full h-64 object-contain rounded-lg bg-gray-100" alt="Captured QR">
+                        <p class="text-sm text-gray-600 mt-3">
+                            If the QR code is clear above, please enter it below:
+                        </p>
+                        <input type="text" id="qrInput" 
+                            class="w-full mt-3 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="Enter QR code (e.g., ID001)"
+                            autofocus>
+                    </div>
+                    
+                    <div class="p-4 border-t flex justify-end gap-3">
+                        <button onclick="closePreview()" class="px-4 py-2 text-gray-600 hover:text-gray-800">
+                            Cancel
+                        </button>
+                        <button onclick="processQRInput()" class="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                            Confirm
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Add preview to page
+        const previewDiv = document.createElement('div');
+        previewDiv.id = 'capturePreview';
+        previewDiv.innerHTML = previewHTML;
+        document.body.appendChild(previewDiv);
+        
+        // Clean up URL when done
+        setTimeout(() => URL.revokeObjectURL(imageUrl), 30000);
+    }, 'image/jpeg', 0.95); // High quality JPEG
+}
+
+/* PROCESS QR INPUT */
+function processQRInput() {
+    const qrInput = document.getElementById('qrInput');
+    const qrCode = qrInput.value.trim();
+    
+    if (!qrCode) {
+        alert("Please enter a QR code");
+        return;
+    }
+    
+    closePreview();
+    processScannedCode(qrCode);
+}
+
+/* CLOSE PREVIEW */
+function closePreview() {
+    const preview = document.getElementById('capturePreview');
+    if (preview) {
+        preview.remove();
+    }
+}
+
+/* TOGGLE FLASH */
+function toggleFlash() {
+    if (!videoStream) return;
+    
+    const videoTrack = videoStream.getVideoTracks()[0];
+    const flashBtn = document.getElementById('flashBtn');
+    
+    if (videoTrack && videoTrack.getCapabilities && videoTrack.getCapabilities().torch) {
+        isFlashOn = !isFlashOn;
+        
+        videoTrack.applyConstraints({
+            advanced: [{ torch: isFlashOn }]
+        }).then(() => {
+            flashBtn.classList.toggle('flash-on', isFlashOn);
+        }).catch(console.error);
     } else {
-        // User cancelled or entered nothing
-        document.getElementById('cameraSection').classList.add('hidden');
+        alert("Flash not available on this device");
     }
 }
 
-function stopCameraPreview() {
-    if (mediaStream) {
-        mediaStream.getTracks().forEach(track => track.stop());
-        mediaStream = null;
+/* SWITCH CAMERA */
+async function switchCamera() {
+    if (!videoStream) return;
+    
+    currentFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
+    
+    // Stop current stream
+    videoStream.getTracks().forEach(track => track.stop());
+    
+    // Start new stream
+    await startScanner(currentScanMode);
+}
+
+/* STOP SCANNER */
+function stopScanner() {
+    if (videoStream) {
+        videoStream.getTracks().forEach(track => track.stop());
+        videoStream = null;
     }
     
-    const video = document.getElementById('cameraVideo');
+    const video = document.getElementById('scannerVideo');
     video.srcObject = null;
-    video.style.display = 'none';
-    document.getElementById('cameraPlaceholder').style.display = 'block';
-}
-
-function stopCamera() {
-    stopCameraPreview();
-    document.getElementById('cameraSection').classList.add('hidden');
+    
+    document.getElementById('scannerSection').classList.add('hidden');
     currentScanMode = null;
     isProcessing = false;
 }
 
 /* PROCESS SCANNED CODE */
 async function processScannedCode(serial) {
-    if (!serial) return;
-    
     serial = serial.trim().toUpperCase();
     
-    // Validate QR format
-    if (!serial.startsWith("ID")) {
-        alert("❌ Invalid QR Code\n\nExpected format: ID### (e.g., ID001, ID123)\n\nYou entered: " + serial);
-        return;
-    }
-    
-    // Extract number part
-    const serialNumber = serial.substring(2);
-    if (!/^\d+$/.test(serialNumber)) {
-        alert("❌ Invalid QR Code\n\nExpected format: ID followed by numbers\nExample: ID001, ID123\n\nYou entered: " + serial);
+    // Validate format
+    if (!serial.startsWith("ID") || !/^ID\d{1,4}$/.test(serial)) {
+        alert("Invalid QR format. Should be ID followed by numbers (e.g., ID001, ID1234)");
         return;
     }
     
     if (currentScanMode === "add") {
         if (stock[serial]) {
-            alert(`⚠️ Already Exists!\n\nSerial: ${serial}\nMaterial: ${stock[serial]}\n\nThis item is already in stock.`);
+            alert(`❌ Already exists: ${stock[serial]}\n\nSerial: ${serial}`);
             return;
         }
         
-        let materialName = prompt(`📝 Enter Material Name for:\n\nSerial: ${serial}\n\nMaterial Name:`, "");
+        const materialName = prompt(`📝 Enter material name for:\n\nSerial: ${serial}\n\nMaterial name:`);
         
-        if (!materialName || materialName.trim() === "") {
-            alert("❌ No material name entered. Operation cancelled.");
+        if (!materialName || !materialName.trim()) {
+            alert("Operation cancelled");
             return;
         }
-        
-        materialName = materialName.trim();
         
         try {
-            // Save to database
-            await db.collection("materials").doc(serial).set({ material: materialName });
+            await db.collection("materials").doc(serial).set({ 
+                material: materialName.trim() 
+            });
+            
             await db.collection("history").add({
                 serial: serial,
-                material: materialName,
+                material: materialName.trim(),
                 type: "Add",
                 date: new Date(),
                 timestamp: firebase.firestore.FieldValue.serverTimestamp()
             });
             
-            alert(`✅ Added Successfully!\n\nMaterial: ${materialName}\nSerial: ${serial}\n\nItem has been added to inventory.`);
-            
-            // Update display
-            renderStock();
+            alert(`✅ Added: ${materialName.trim()}\nSerial: ${serial}`);
             
         } catch (error) {
-            alert("❌ Database Error\n\nFailed to save: " + error.message);
+            alert("Error saving: " + error.message);
         }
     }
     
     if (currentScanMode === "consume") {
         if (!stock[serial]) {
-            alert(`❌ Not Found!\n\nSerial: ${serial}\n\nThis item is not in the inventory.`);
+            alert(`❌ Not found in stock\n\nSerial: ${serial}`);
             return;
         }
         
-        let materialName = stock[serial];
+        const materialName = stock[serial];
         
-        // Confirm consumption
-        if (!confirm(`🗑️ Confirm Consumption\n\nMaterial: ${materialName}\nSerial: ${serial}\n\nRemove from inventory?`)) {
-            return;
-        }
-        
-        try {
-            await db.collection("materials").doc(serial).delete();
-            await db.collection("history").add({
-                serial: serial,
-                material: materialName,
-                type: "Consume",
-                date: new Date(),
-                timestamp: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            
-            alert(`✅ Consumed Successfully!\n\nMaterial: ${materialName}\nSerial: ${serial}\n\nItem has been removed from inventory.`);
-            
-            // Update display
-            renderStock();
-            
-        } catch (error) {
-            alert("❌ Database Error\n\nFailed to update: " + error.message);
+        if (confirm(`🗑️ Remove from inventory?\n\n${materialName}\nSerial: ${serial}`)) {
+            try {
+                await db.collection("materials").doc(serial).delete();
+                
+                await db.collection("history").add({
+                    serial: serial,
+                    material: materialName,
+                    type: "Consume",
+                    date: new Date(),
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                alert(`✅ Removed: ${materialName}\nSerial: ${serial}`);
+                
+            } catch (error) {
+                alert("Error removing: " + error.message);
+            }
         }
     }
     
-    // Hide camera section
-    document.getElementById('cameraSection').classList.add('hidden');
-    stopCameraPreview();
+    // Close scanner and update display
+    stopScanner();
+    renderStock();
 }
 
 /* EXPORT CSV */
@@ -536,52 +588,36 @@ function exportCSV() {
 
 /* GENERATE QR PDF */
 async function generateQR() {
-    const n = parseInt(prompt("How many QR codes to generate?"));
-    if (!n || n < 1) {
-        alert("Please enter a valid number");
-        return;
-    }
+    const count = parseInt(prompt("How many QR codes to generate?"));
+    if (!count || count < 1) return;
     
     const settingsDoc = await db.collection("settings").doc("qr").get();
-    let last = 900;
-    
-    if (settingsDoc.exists) {
-        last = settingsDoc.data().lastNumber || 900;
-        if (last < 900) last = 900;
-    }
+    let last = settingsDoc.exists ? (settingsDoc.data().lastNumber || 900) : 900;
+    if (last < 900) last = 900;
     
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF({ unit: "mm", format: [100, 150] });
     
-    const qrSize = 25;
-    const textGap = 3;
-    const fontSize = 8;
-    const marginX = 5;
-    const marginY = 5;
-    const qrPerRow = 4;
-    const spacingX = (100 - 2 * marginX - qrPerRow * qrSize) / (qrPerRow - 1);
+    const qrSize = 25, textGap = 3, fontSize = 8;
+    const marginX = 5, marginY = 5, qrPerRow = 4;
+    const spacingX = (100 - 2*marginX - qrPerRow*qrSize) / (qrPerRow - 1);
     const spacingY = 7;
     
-    let x = marginX;
-    let y = marginY;
-    let col = 0;
+    let x = marginX, y = marginY, col = 0;
     
-    alert(`🔄 Generating ${n} QR codes... Please wait.`);
-    
-    for (let i = 1; i <= n; i++) {
+    for (let i = 1; i <= count; i++) {
         const id = "ID" + String(++last).padStart(3, "0");
         
         const canvas = document.createElement("canvas");
         await QRCode.toCanvas(canvas, id, {
             width: qrSize * 4,
-            margin: 2,
-            color: { dark: "#000000", light: "#FFFFFF" },
-            errorCorrectionLevel: 'H'
+            margin: 1,
+            color: { dark: "#000000", light: "#FFFFFF" }
         });
         
         pdf.addImage(canvas, "PNG", x, y, qrSize, qrSize);
         pdf.setFontSize(fontSize);
-        pdf.text(id, x + qrSize / 2, y + qrSize + textGap, { align: "center" });
+        pdf.text(id, x + qrSize/2, y + qrSize + textGap, { align: "center" });
         
         col++;
         if (col < qrPerRow) {
@@ -598,20 +634,23 @@ async function generateQR() {
         }
     }
     
-    const filename = `QR_Codes_ID${String(last - n + 1).padStart(3, '0')}_to_ID${String(last).padStart(3, '0')}.pdf`;
-    pdf.save(filename);
-    
+    pdf.save(`QR_Codes_ID${String(last-count+1).padStart(3,'0')}_to_ID${String(last).padStart(3,'0')}.pdf`);
     await db.collection("settings").doc("qr").set({ lastNumber: last });
     
-    alert(`✅ Generated ${n} QR Codes!\n\nFrom: ID${String(last - n + 1).padStart(3, '0')}\nTo: ID${String(last).padStart(3, '0')}\n\nFile: ${filename}`);
+    alert(`Generated ${count} QR codes\nFrom: ID${String(last-count+1).padStart(3,'0')}\nTo: ID${String(last).padStart(3,'0')}`);
 }
 
 /* CLEANUP */
-window.addEventListener('beforeunload', stopCamera);
-window.addEventListener('pagehide', stopCamera);
+window.addEventListener('beforeunload', stopScanner);
+window.addEventListener('pagehide', stopScanner);
 
-// Initialize
-renderStock();
+// Close preview on escape key
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        closePreview();
+        stopScanner();
+    }
+});
 
 </script>
 </body>

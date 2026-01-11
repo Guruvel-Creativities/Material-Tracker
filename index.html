@@ -374,13 +374,13 @@ async function generateQR() {
     if (!count || count < 1) return;
     
     const settingsDoc = await db.collection("settings").doc("qr").get();
-    let last = settingsDoc.exists ? (settingsDoc.data().lastNumber || 900) : 900;
-    if (last < 900) last = 900;
+    let last = settingsDoc.exists ? (settingsDoc.data().lastNumber || 940) : 940;
+    if (last < 940) last = 940;
     
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF({ unit: "mm", format: [100, 150] });
     
-    const qrSize = 25, textGap = 3, fontSize = 8;
+    const qrSize = 22, textGap = 3, fontSize = 8;
     const marginX = 5, marginY = 5, qrPerRow = 4;
     const spacingX = (100 - 2*marginX - qrPerRow*qrSize) / (qrPerRow - 1);
     const spacingY = 7;
@@ -432,3 +432,4 @@ renderStock();
 </script>
 </body>
 </html>
+

@@ -1,454 +1,265 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Guruvel Creativities Inventory</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guruvel Creativities Inventory</title>
 
-<script src="https://cdn.tailwindcss.com"></script>
-<!-- HTML5 QR Code Scanner - This was working -->
-<script src="https://unpkg.com/html5-qrcode"></script>
-<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js"></script>
-<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.4.4/build/qrcode.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 
-<style>
-    /* Simple scanner container */
-    #qr-reader {
-        width: 100%;
-        max-width: 400px;
-        margin: 0 auto;
-    }
-    
-    #qr-reader video {
-        width: 100% !important;
-        height: auto !important;
-        border-radius: 12px;
-    }
-    
-    .scanning-text {
-        text-align: center;
-        margin-top: 10px;
-        color: #4B5563;
-        font-size: 14px;
-    }
-</style>
+    <style>
+        #qr-reader { width: 100%; max-width: 400px; margin: 0 auto; }
+        #qr-reader video { width: 100% !important; height: auto !important; border-radius: 12px; }
+        .scanning-text { text-align: center; margin-top: 10px; color: #4B5563; font-size: 14px; }
+    </style>
 </head>
 
 <body class="bg-gray-100 min-h-screen p-4">
-<div class="max-w-4xl mx-auto">
 
-<!-- HEADER -->
-<div class="bg-white rounded-xl shadow-lg p-6 mb-6">
-    <div class="flex items-center gap-4 mb-6">
-        <img class="w-16 md:w-20" src="https://raw.githubusercontent.com/Guruvel-Creativities/Material-Tracker/main/Logo.PNG" alt="Logo">
-        <h1 class="text-xl md:text-2xl font-bold text-gray-900">Guruvel Creativities Inventory</h1>
-    </div>
-    
-    <!-- ACTION BUTTONS -->
-    <div class="flex flex-wrap gap-3 mb-4">
-        <button onclick="generateQR()" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg">
-            Generate QR
-        </button>
-        <button onclick="startScanner('add')" class="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg">
-            Add Item
-        </button>
-        <button onclick="startScanner('consume')" class="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg">
-            Consume Item
-        </button>
-    </div>
-    
-    <!-- SEARCH -->
-    <input id="searchInput" oninput="renderStock()" placeholder="🔍 Search materials..."
-        class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-</div>
-
-<!-- SCANNER SECTION -->
-<div id="scannerSection" class="hidden bg-white rounded-xl shadow-lg p-6 mb-6">
-    <div id="qr-reader"></div>
-    <div class="scanning-text">
-        Point camera at QR code. It will scan automatically.
-    </div>
-    
-    <div class="text-center mt-6">
-        <button onclick="stopScanner()" class="px-6 py-2.5 bg-yellow-500 hover:bg-yellow-600 text-white font-medium rounded-lg">
-            Close Scanner
-        </button>
-    </div>
-</div>
-
-<!-- STOCK DISPLAY -->
-<div class="bg-white rounded-xl shadow-lg p-6 mb-6">
-    <h2 class="text-lg md:text-xl font-bold text-gray-800 mb-4">📦 Current Stock</h2>
-    <div id="stockList" class="space-y-2 max-h-96 overflow-y-auto">
-        <!-- Stock will load here -->
-    </div>
-</div>
-
-<!-- EXPORT SECTION -->
-<div class="bg-white rounded-xl shadow-lg p-6">
-    <h2 class="text-lg md:text-xl font-bold text-gray-800 mb-4">📊 Export History</h2>
-    
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-        <div class="relative">
-            <input type="date" id="fromDate" class="w-full p-3 pl-10 border border-gray-300 rounded-lg">
-            <span class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">From</span>
+    <div id="loginPage" class="fixed inset-0 bg-gray-900 flex items-center justify-center z-50">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md mx-4 text-center">
+            <img class="w-24 mx-auto mb-4" src="https://raw.githubusercontent.com/Guruvel-Creativities/Material-Tracker/main/Logo.PNG" alt="Logo">
+            <h2 class="text-2xl font-bold text-gray-800">Inventory Login</h2>
+            <div class="space-y-4 mt-6 text-left">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Email Address</label>
+                    <input type="email" id="loginEmail" class="w-full p-3 mt-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Password</label>
+                    <div class="relative mt-1">
+                        <input type="password" id="loginPassword" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none pr-10" placeholder="••••••••">
+                        <button type="button" onclick="togglePassword()" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400">
+                            <svg id="eyeIcon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <button onclick="handleLogin()" id="loginBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow-lg">Sign In</button>
+                <p id="loginError" class="text-red-500 text-sm text-center hidden font-medium"></p>
+            </div>
         </div>
-        
-        <div class="relative">
-            <input type="date" id="toDate" class="w-full p-3 pl-10 border border-gray-300 rounded-lg">
-            <span class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">To</span>
-        </div>
-        
-        <select id="filterType" class="p-3 border border-gray-300 rounded-lg">
-            <option value="ALL">All Types</option>
-            <option value="Add">Add Only</option>
-            <option value="Consume">Consume Only</option>
-        </select>
-        
-        <button onclick="exportCSV()" class="p-3 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg">
-            Export CSV
-        </button>
     </div>
-</div>
 
-</div>
+    <div id="mainApp" class="max-w-4xl mx-auto hidden">
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-6 relative">
+            <button onclick="handleLogout()" class="absolute top-4 right-4 text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded text-gray-500 font-medium">Logout</button>
+            <div class="flex items-center gap-4 mb-6">
+                <img class="w-16 md:w-20" src="https://raw.githubusercontent.com/Guruvel-Creativities/Material-Tracker/main/Logo.PNG" alt="Logo">
+                <h1 class="text-xl md:text-2xl font-bold text-gray-900">Guruvel Creativities Inventory</h1>
+            </div>
+            <div class="flex flex-wrap gap-3 mb-4">
+                <button onclick="generateQR()" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg">Generate QR</button>
+                <button onclick="startScanner('add')" class="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg">Add Item</button>
+                <button onclick="startScanner('consume')" class="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg">Consume Item</button>
+            </div>
+            <input id="searchInput" oninput="renderStock()" placeholder="🔍 Search materials..." class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <div id="scannerSection" class="hidden bg-white rounded-xl shadow-lg p-6 mb-6">
+            <div id="qr-reader"></div>
+            <div class="scanning-text">Point camera at QR code. It will scan automatically.</div>
+            <div class="text-center mt-6">
+                <button onclick="stopScanner()" class="px-6 py-2.5 bg-yellow-500 hover:bg-yellow-600 text-white font-medium rounded-lg">Close Scanner</button>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+            <h2 class="text-lg md:text-xl font-bold text-gray-800 mb-4">📦 Current Stock</h2>
+            <div id="stockList" class="space-y-2 max-h-96 overflow-y-auto"></div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <h2 class="text-lg md:text-xl font-bold text-gray-800 mb-4">📊 Export History</h2>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <input type="date" id="fromDate" class="p-3 border border-gray-300 rounded-lg">
+                <input type="date" id="toDate" class="p-3 border border-gray-300 rounded-lg">
+                <select id="filterType" class="p-3 border border-gray-300 rounded-lg">
+                    <option value="ALL">All Types</option>
+                    <option value="Add">Add Only</option>
+                    <option value="Consume">Consume Only</option>
+                </select>
+                <button onclick="exportCSV()" class="p-3 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg">Export CSV</button>
+            </div>
+        </div>
+    </div>
 
 <script>
 /* FIREBASE INIT */
 firebase.initializeApp({
- apiKey: "AIzaSyBmXJZ6dm-SLzzIvz9P22kXI23MwdW3WC0",
- authDomain: "material-tracker-49dac.firebaseapp.com",
- projectId: "material-tracker-49dac"
+    apiKey: "AIzaSyBmXJZ6dm-SLzzIvz9P22kXI23MwdW3WC0",
+    authDomain: "material-tracker-49dac.firebaseapp.com",
+    projectId: "material-tracker-49dac"
 });
 const db = firebase.firestore();
+const auth = firebase.auth();
 
-/* DATA STORAGE */
 let stock = {}, history = [];
 let currentScanMode = null;
 let html5QrCode = null;
 let isScanning = false;
+let logoutTimer;
 
-/* REALTIME DATA */
-db.collection("materials").onSnapshot(s => {
-    stock = {}; 
-    s.forEach(d => stock[d.id] = d.data().material); 
-    renderStock();
-});
-
-db.collection("history").orderBy("date", "desc").onSnapshot(s => {
-    history = []; 
-    s.forEach(d => history.push(d.data()));
-});
-
-/* RENDER STOCK */
-function renderStock() {
-    const searchTerm = document.getElementById("searchInput").value.toLowerCase();
-    let counted = {};
-    
-    Object.values(stock).forEach(material => {
-        if (material.toLowerCase().includes(searchTerm)) {
-            counted[material] = (counted[material] || 0) + 1;
-        }
-    });
-    
-    const stockList = document.getElementById("stockList");
-    const stockEntries = Object.entries(counted);
-    
-    if (stockEntries.length === 0) {
-        stockList.innerHTML = `
-            <div class="text-center py-8 text-gray-500">
-                No materials found
-            </div>`;
-        return;
+/* INACTIVITY TIMER (2 Minutes) */
+function resetLogoutTimer() {
+    clearTimeout(logoutTimer);
+    if (auth.currentUser) {
+        logoutTimer = setTimeout(() => {
+            alert("Logged out due to 2 minutes of inactivity.");
+            handleLogout();
+        }, 120000); // 120,000ms = 2 minutes
     }
-    
-    stockList.innerHTML = stockEntries.map(([material, count], index) => `
-        <div class="flex justify-between items-center p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
-            <div class="flex items-center">
-                <span class="w-8 h-8 flex items-center justify-center bg-blue-100 text-blue-800 rounded-full mr-3 font-medium">
-                    ${index + 1}
-                </span>
-                <span class="text-gray-800">${material}</span>
-            </div>
-            <span class="bg-green-100 text-green-800 px-3 py-1 rounded-full font-medium">
-                ${count}
-            </span>
-        </div>
-    `).join('');
 }
 
-/* SIMPLE QR SCANNER - USING HTML5QRCODE */
-async function startScanner(mode) {
-    if (isScanning) {
-        stopScanner();
-        setTimeout(() => startScanner(mode), 300);
-        return;
+// Listen for interactions to reset timer
+window.onload = resetLogoutTimer;
+document.onmousemove = resetLogoutTimer;
+document.onkeypress = resetLogoutTimer;
+document.onclick = resetLogoutTimer;
+
+/* AUTHENTICATION */
+function togglePassword() {
+    const input = document.getElementById("loginPassword");
+    const icon = document.getElementById("eyeIcon");
+    if (input.type === "password") {
+        input.type = "text";
+        icon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />`;
+    } else {
+        input.type = "password";
+        icon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />`;
     }
-    
+}
+
+function handleLogin() {
+    const email = document.getElementById("loginEmail").value;
+    const pass = document.getElementById("loginPassword").value;
+    const btn = document.getElementById("loginBtn");
+    const err = document.getElementById("loginError");
+    if (!email || !pass) return alert("Please fill fields");
+    btn.disabled = true; btn.innerText = "Signing in...";
+    auth.signInWithEmailAndPassword(email, pass).catch(e => {
+        btn.disabled = false; btn.innerText = "Sign In";
+        err.innerText = e.message; err.classList.remove("hidden");
+    });
+}
+
+function handleLogout() {
+    auth.signOut();
+    clearTimeout(logoutTimer);
+}
+
+auth.onAuthStateChanged(user => {
+    document.getElementById("loginPage").classList.toggle("hidden", !!user);
+    document.getElementById("mainApp").classList.toggle("hidden", !user);
+    if (user) { loadData(); resetLogoutTimer(); }
+});
+
+/* INVENTORY LOGIC */
+function loadData() {
+    db.collection("materials").onSnapshot(s => { stock = {}; s.forEach(d => stock[d.id] = d.data().material); renderStock(); });
+    db.collection("history").orderBy("date", "desc").onSnapshot(s => { history = []; s.forEach(d => history.push(d.data())); });
+}
+
+function renderStock() {
+    const term = document.getElementById("searchInput").value.toLowerCase();
+    let counted = {};
+    Object.values(stock).forEach(m => { if(m.toLowerCase().includes(term)) counted[m] = (counted[m] || 0) + 1; });
+    const stockList = document.getElementById("stockList");
+    const entries = Object.entries(counted);
+    if (!entries.length) { stockList.innerHTML = `<div class='text-center py-8 text-gray-500'>No materials found</div>`; return; }
+    stockList.innerHTML = entries.map(([m, c], i) => `
+        <div class="flex justify-between items-center p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
+            <div class="flex items-center"><span class="w-8 h-8 flex items-center justify-center bg-blue-100 text-blue-800 rounded-full mr-3 font-medium">${i+1}</span><span class="text-gray-800">${m}</span></div>
+            <span class="bg-green-100 text-green-800 px-3 py-1 rounded-full font-medium">${c}</span>
+        </div>`).join('');
+}
+
+async function startScanner(mode) {
+    if (isScanning) { stopScanner(); setTimeout(() => startScanner(mode), 300); return; }
     currentScanMode = mode;
     document.getElementById('scannerSection').classList.remove('hidden');
-    document.getElementById('qr-reader').innerHTML = '';
-    
-    try {
-        html5QrCode = new Html5Qrcode("qr-reader");
-        
-        // SIMPLE CONFIG THAT WORKS ON IPHONE
-        const config = {
-            fps: 10, // Lower FPS for better compatibility
-            qrbox: { 
-                width: 250, 
-                height: 250 
-            },
-            aspectRatio: 1.0,
-            disableFlip: false
-        };
-        
-        // Start with minimal constraints
-        await html5QrCode.start(
-            { facingMode: "environment" }, // Use rear camera
-            config,
-            (decodedText) => {
-                // QR code detected!
-                handleScan(decodedText, mode);
-            },
-            (errorMessage) => {
-                // Ignore "No QR code found" errors
-                if (!errorMessage.includes("No QR code found")) {
-                    console.log("Scan error:", errorMessage);
-                }
-            }
-        );
-        
-        isScanning = true;
-        
-    } catch (error) {
-        console.error("Scanner error:", error);
-        alert("Camera access failed. Please check permissions and try again.");
-        stopScanner();
-    }
+    html5QrCode = new Html5Qrcode("qr-reader");
+    const config = { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 };
+    await html5QrCode.start({ facingMode: "environment" }, config, (text) => handleScan(text, mode));
+    isScanning = true;
 }
 
-/* HANDLE SCAN RESULT */
 async function handleScan(serial, mode) {
-    // Stop scanner immediately
-    if (html5QrCode && isScanning) {
-        await html5QrCode.stop();
-        isScanning = false;
-    }
-    
-    // Hide scanner
+    if (html5QrCode && isScanning) { await html5QrCode.stop(); isScanning = false; }
     document.getElementById('scannerSection').classList.add('hidden');
-    
     serial = serial.trim().toUpperCase();
-    
-    // Validate format
-    if (!serial.startsWith("ID") || !/^ID\d+$/.test(serial)) {
-        alert(`Invalid QR code format.\n\nExpected: ID followed by numbers\nExample: ID001, ID123\n\nScanned: ${serial}`);
-        return;
-    }
-    
+    if (!serial.startsWith("ID")) return alert("Invalid QR");
     if (mode === "add") {
-        // Check if exists
-        if (stock[serial]) {
-            alert(`Already exists!\n\nSerial: ${serial}\nMaterial: ${stock[serial]}`);
-            return;
-        }
-        
-        // Get material name
-        const materialName = prompt(`Enter material name for:\n\n${serial}\n\nMaterial name:`, "");
-        
-        if (!materialName || !materialName.trim()) {
-            alert("Cancelled");
-            return;
-        }
-        
-        try {
-            // Save to database
-            await db.collection("materials").doc(serial).set({ 
-                material: materialName.trim() 
-            });
-            
-            await db.collection("history").add({
-                serial: serial,
-                material: materialName.trim(),
-                type: "Add",
-                date: new Date(),
-                timestamp: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            
-            alert(`Added: ${materialName.trim()}\nSerial: ${serial}`);
-            
-        } catch (error) {
-            alert("Error saving: " + error.message);
+        if (stock[serial]) return alert("Already exists");
+        const name = prompt("Enter material name:");
+        if (!name) return;
+        await db.collection("materials").doc(serial).set({ material: name.trim() });
+        await db.collection("history").add({ serial, material: name.trim(), type: "Add", date: new Date(), timestamp: firebase.firestore.FieldValue.serverTimestamp() });
+    } else {
+        if (!stock[serial]) return alert("Not found");
+        if (confirm(`Remove ${stock[serial]}?`)) {
+            const name = stock[serial];
+            await db.collection("materials").doc(serial).delete();
+            await db.collection("history").add({ serial, material: name, type: "Consume", date: new Date(), timestamp: firebase.firestore.FieldValue.serverTimestamp() });
         }
     }
-    
-    if (mode === "consume") {
-        // Check if exists
-        if (!stock[serial]) {
-            alert(`Not found!\n\nSerial: ${serial}\n\nNot in inventory.`);
-            return;
-        }
-        
-        const materialName = stock[serial];
-        
-        if (confirm(`Remove from inventory?\n\n${materialName}\nSerial: ${serial}`)) {
-            try {
-                await db.collection("materials").doc(serial).delete();
-                
-                await db.collection("history").add({
-                    serial: serial,
-                    material: materialName,
-                    type: "Consume",
-                    date: new Date(),
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                
-                alert(`Removed: ${materialName}\nSerial: ${serial}`);
-                
-            } catch (error) {
-                alert("Error removing: " + error.message);
-            }
-        }
-    }
-    
-    // Update display
-    renderStock();
 }
 
-/* STOP SCANNER */
 async function stopScanner() {
-    if (html5QrCode && isScanning) {
-        try {
-            await html5QrCode.stop();
-            html5QrCode.clear();
-        } catch (error) {
-            console.log("Error stopping scanner:", error);
-        }
-    }
-    
+    if (html5QrCode && isScanning) { try { await html5QrCode.stop(); html5QrCode.clear(); } catch(e){} }
     isScanning = false;
     document.getElementById('scannerSection').classList.add('hidden');
-    document.getElementById('qr-reader').innerHTML = '';
-    currentScanMode = null;
 }
 
-/* EXPORT CSV */
 function exportCSV() {
     const from = document.getElementById("fromDate").value;
     const to = document.getElementById("toDate").value;
-    const filterType = document.getElementById("filterType").value;
-    
+    const filter = document.getElementById("filterType").value;
     let rows = [["Serial", "Material", "Type", "Date"]];
-    
-    history.filter(entry => {
-        let matches = true;
-        if (filterType !== "ALL") matches = entry.type === filterType;
-        
-        const entryDate = new Date(entry.date.seconds * 1000);
-        if (from) matches = matches && entryDate >= new Date(from);
-        if (to) matches = matches && entryDate <= new Date(to + "T23:59:59");
-        
-        return matches;
-    }).forEach(entry => {
-        rows.push([
-            entry.serial,
-            entry.material,
-            entry.type,
-            new Date(entry.date.seconds * 1000).toLocaleString()
-        ]);
-    });
-    
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(rows), "Inventory_Data");
-    XLSX.writeFile(workbook, `Inventory_History.csv`);
+    history.filter(e => {
+        let m = (filter === "ALL" || e.type === filter);
+        const d = new Date(e.date.seconds * 1000);
+        if (from) m = m && d >= new Date(from);
+        if (to) m = m && d <= new Date(to + "T23:59:59");
+        return m;
+    }).forEach(e => rows.push([e.serial, e.material, e.type, new Date(e.date.seconds * 1000).toLocaleString()]));
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Inventory");
+    XLSX.writeFile(wb, "Inventory_History.csv");
 }
 
-/* GENERATE QR PDF */
-/* GENERATE QR PDF - UPDATED TO START FROM 941 */
 async function generateQR() {
-    const count = parseInt(prompt("How many QR codes to generate?"));
+    const count = parseInt(prompt("How many QR?"));
     if (!count || count < 1) return;
-    
-    const settingsDoc = await db.collection("settings").doc("qr").get();
-    let last = settingsDoc.exists ? (settingsDoc.data().lastNumber || 940) : 940;
-    
-    // START FROM 941 (since 940 is the last used, next should be 941)
-    if (last <= 940) last = 940; // Force start from 941 by setting last to 940
-    
-    // Verify we're starting from 941
-    if (last < 940) last = 940;
-    
+    const snap = await db.collection("settings").doc("qr").get();
+    let last = snap.exists ? (snap.data().lastNumber || 940) : 940;
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF({ unit: "mm", format: [100, 150] });
-    
-    const qrSize = 22, textGap = 3, fontSize = 8;
-    const marginX = 5, marginY = 5, qrPerRow = 4;
-    const spacingX = (100 - 2*marginX - qrPerRow*qrSize) / (qrPerRow - 1);
-    const spacingY = 7;
-    
-    let x = marginX, y = marginY, col = 0;
-    
-    for (let i = 1; i <= count; i++) {
-        // Increment last number and generate ID
+    let x=5, y=5, col=0;
+    for (let i=1; i<=count; i++) {
         const id = "ID" + String(++last).padStart(3, "0");
-        
-        // Create QR code canvas
         const canvas = document.createElement("canvas");
-        await QRCode.toCanvas(canvas, id, {
-            width: qrSize * 4,
-            margin: 1,
-            color: { dark: "#000000", light: "#FFFFFF" }
-        });
-        
-        // Add QR code and text to PDF
-        pdf.addImage(canvas, "PNG", x, y, qrSize, qrSize);
-        pdf.setFontSize(fontSize);
-        pdf.text(id, x + qrSize/2, y + qrSize + textGap, { align: "center" });
-        
-        // Move to next position
-        col++;
-        if (col < qrPerRow) {
-            x += qrSize + spacingX;
-        } else {
-            col = 0;
-            x = marginX;
-            y += qrSize + textGap + spacingY;
-            
-            // Add new page if needed
-            if (y + qrSize + textGap > 150 - marginY) {
-                pdf.addPage([100, 150]);
-                y = marginY;
-            }
-        }
+        await QRCode.toCanvas(canvas, id, { width: 88, margin: 1 });
+        pdf.addImage(canvas, "PNG", x, y, 22, 22);
+        pdf.setFontSize(8); pdf.text(id, x + 11, y + 25, { align: "center" });
+        col++; if (col < 4) x += 24; else { col=0; x=5; y+=35; if(y>120){ pdf.addPage(); y=5; } }
     }
-    
-    // Generate filename with proper range
-    const startID = last - count + 1;
-    const filename = `QR_Codes_ID${String(startID).padStart(3,'0')}_to_ID${String(last).padStart(3,'0')}.pdf`;
-    
-    // Save PDF
-    pdf.save(filename);
-    
-    // Save last used number to Firestore
+    pdf.save("QR_Codes.pdf");
     await db.collection("settings").doc("qr").set({ lastNumber: last });
-    
-    // Show success message
-    alert(`Generated ${count} QR codes\nFrom: ID${String(startID).padStart(3,'0')}\nTo: ID${String(last).padStart(3,'0')}`);
 }
-/* CLEANUP */
+
 window.addEventListener('beforeunload', stopScanner);
-window.addEventListener('pagehide', stopScanner);
-
-// Initialize
-renderStock();
-
 </script>
 </body>
 </html>
-
-

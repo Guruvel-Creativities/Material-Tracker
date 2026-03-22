@@ -115,9 +115,9 @@ function resetLogoutTimer() {
     clearTimeout(logoutTimer);
     if (auth.currentUser) {
         logoutTimer = setTimeout(() => {
-            alert("Logged out due to 2 minutes of inactivity.");
+            alert("Logged out due to 10 minutes of inactivity.");
             handleLogout();
-        }, 120000); // 120,000ms = 2 minutes
+        }, 600000); // 120,000ms = 2 minutes
     }
 }
 

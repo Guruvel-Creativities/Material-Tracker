@@ -15,86 +15,141 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 
     <style>
-        #qr-reader { width: 100%; max-width: 400px; margin: 0 auto; }
-        #qr-reader video { width: 100% !important; height: auto !important; border-radius: 12px; }
-        .scanning-text { text-align: center; margin-top: 10px; color: #4B5563; font-size: 14px; }
+        #qr-reader { width: 100%; max-width: 400px; margin: 0 auto; border: none !important; }
+        #qr-reader video { width: 100% !important; height: auto !important; border-radius: 16px; }
+        .scanning-text { text-align: center; margin-top: 12px; color: #4B5563; font-size: 14px; font-weight: 500; }
+        /* Smooth custom scrollbar for stock list */
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: #F3F4F6; border-radius: 10px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 10px; }
+        .custom-scroll::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
     </style>
 </head>
 
-<body class="bg-gray-100 min-h-screen p-4">
+<body class="bg-slate-50 min-h-screen font-sans text-slate-800 antialiased">
 
-    <div id="loginPage" class="fixed inset-0 bg-gray-900 flex items-center justify-center z-50">
-        <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md mx-4 text-center">
-            <img class="w-24 mx-auto mb-4" src="https://raw.githubusercontent.com/Guruvel-Creativities/Material-Tracker/main/Logo.PNG" alt="Logo">
-            <h2 class="text-2xl font-bold text-gray-800">Inventory Login</h2>
-            <div class="space-y-4 mt-6 text-left">
+    <div id="loginPage" class="fixed inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center z-50 p-4">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md border border-slate-100 text-center transform transition-all">
+            <div class="inline-flex p-3 bg-slate-50 rounded-2xl shadow-inner mb-4">
+                <img class="w-20 object-contain" src="https://raw.githubusercontent.com/Guruvel-Creativities/Material-Tracker/main/Logo.PNG" alt="Logo">
+            </div>
+            <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Welcome Back</h2>
+            <p class="text-sm text-slate-500 mt-1 mb-6">Sign in to manage your inventory metrics</p>
+            
+            <div class="space-y-4 text-left">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700">Email Address</label>
-                    <input type="email" id="loginEmail" class="w-full p-3 mt-1 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                    <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider">Email Address</label>
+                    <input type="email" id="loginEmail" class="w-full p-3 mt-1.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none transition-all text-sm">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700">Password</label>
-                    <div class="relative mt-1">
-                        <input type="password" id="loginPassword" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none pr-10" placeholder="••••••••">
-                        <button type="button" onclick="togglePassword()" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400">
-                            <svg id="eyeIcon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                    <label class="block text-xs font-semibold text-slate-600 uppercase tracking-wider">Password</label>
+                    <div class="relative mt-1.5">
+                        <input type="password" id="loginPassword" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none pr-10 transition-all text-sm" placeholder="••••••••">
+                        <button type="button" onclick="togglePassword()" class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors">
+                            <svg id="eyeIcon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="w-5 h-5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" />
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                             </svg>
                         </button>
                     </div>
                 </div>
-                <button onclick="handleLogin()" id="loginBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg shadow-lg">Sign In</button>
-                <p id="loginError" class="text-red-500 text-sm text-center hidden font-medium"></p>
+                <button onclick="handleLogin()" id="loginBtn" class="w-full mt-2 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 active:scale-[0.99] text-white font-bold py-3.5 rounded-xl shadow-lg shadow-indigo-200 transition-all">Sign In</button>
+                <p id="loginError" class="text-red-500 text-xs text-center hidden font-semibold bg-red-50 p-2.5 rounded-lg border border-red-100"></p>
             </div>
         </div>
     </div>
 
-    <div id="mainApp" class="max-w-4xl mx-auto hidden">
-        <div class="bg-white rounded-xl shadow-lg p-6 mb-6 relative">
-            <button onclick="handleLogout()" class="absolute top-4 right-4 text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded text-gray-500 font-medium">Logout</button>
+    <div id="mainApp" class="max-w-4xl mx-auto hidden pt-4 pb-12">
+        
+        <div class="bg-white rounded-2xl shadow-md border border-slate-100 p-6 mb-6 relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
+            
+            <button onclick="handleLogout()" class="absolute top-6 right-6 text-xs bg-slate-50 hover:bg-slate-100 border border-slate-200 hover:text-red-600 px-3 py-1.5 rounded-lg text-slate-500 font-semibold transition-all">
+                Logout
+            </button>
+            
             <div class="flex items-center gap-4 mb-6">
-                <img class="w-16 md:w-20" src="https://raw.githubusercontent.com/Guruvel-Creativities/Material-Tracker/main/Logo.PNG" alt="Logo">
-                <h1 class="text-xl md:text-2xl font-bold text-gray-900">Guruvel Creativities Inventory</h1>
+                <div class="p-2 bg-slate-50 border border-slate-100 rounded-xl shadow-sm">
+                    <img class="w-14 md:w-16 object-contain" src="https://raw.githubusercontent.com/Guruvel-Creativities/Material-Tracker/main/Logo.PNG" alt="Logo">
+                </div>
+                <div>
+                    <h1 class="text-xl md:text-2xl font-black text-slate-900 tracking-tight">Guruvel Creativities</h1>
+                    <p class="text-xs md:text-sm text-slate-500 font-medium">Live Cloud Inventory Management</p>
+                </div>
             </div>
-            <div class="flex flex-wrap gap-3 mb-4">
-                <button onclick="generateQR()" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg">Generate QR</button>
-                <button onclick="startScanner('add')" class="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg">Add Item</button>
-                <button onclick="startScanner('consume')" class="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg">Consume Item</button>
+            
+            <div class="flex flex-wrap gap-3 mb-6">
+                <button onclick="generateQR()" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-semibold text-sm rounded-xl shadow-sm shadow-indigo-100 transition-all flex items-center gap-1.5">🖨️ Generate QR</button>
+                <button onclick="startScanner('add')" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-semibold text-sm rounded-xl shadow-sm shadow-emerald-100 transition-all flex items-center gap-1.5">📥 Add Item</button>
+                <button onclick="startScanner('consume')" class="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-semibold text-sm rounded-xl shadow-sm shadow-rose-100 transition-all flex items-center gap-1.5">📤 Consume Item</button>
             </div>
-            <input id="searchInput" oninput="renderStock()" placeholder="🔍 Search materials..." class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-        </div>
-
-        <div id="scannerSection" class="hidden bg-white rounded-xl shadow-lg p-6 mb-6">
-            <div id="qr-reader"></div>
-            <div class="scanning-text">Point camera at QR code. It will scan automatically.</div>
-            <div class="text-center mt-6">
-                <button onclick="stopScanner()" class="px-6 py-2.5 bg-yellow-500 hover:bg-yellow-600 text-white font-medium rounded-lg">Close Scanner</button>
-            </div>
-        </div>
-
-        <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
-            <h2 class="text-lg md:text-xl font-bold text-gray-800 mb-4">📦 Current Stock</h2>
-            <div id="stockList" class="space-y-2 max-h-96 overflow-y-auto"></div>
-        </div>
-
-        <div class="bg-white rounded-xl shadow-lg p-6">
-            <h2 class="text-lg md:text-xl font-bold text-gray-800 mb-4">📊 Export History</h2>
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <input type="date" id="fromDate" class="p-3 border border-gray-300 rounded-lg">
-                <input type="date" id="toDate" class="p-3 border border-gray-300 rounded-lg">
-                <select id="filterType" class="p-3 border border-gray-300 rounded-lg">
-                    <option value="ALL">All Types</option>
-                    <option value="Add">Add Only</option>
-                    <option value="Consume">Consume Only</option>
+            
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <div class="relative md:col-span-3">
+                    <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    </span>
+                    <input id="searchInput" oninput="renderStock()" placeholder="Search connected inventory materials..." class="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white text-sm font-medium transition-all">
+                </div>
+                <select id="sortStockSelect" onchange="renderStock()" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white font-semibold text-sm text-slate-700 transition-all cursor-pointer">
+                    <option value="Alpha">🔤 Alphabetical (A-Z)</option>
+                    <option value="QtyDesc">📈 Qty: High to Low</option>
+                    <option value="QtyAsc">📉 Qty: Low to High</option>
                 </select>
-                <button onclick="exportCSV()" class="p-3 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg">Export CSV</button>
+            </div>
+        </div>
+
+        <div id="scannerSection" class="hidden bg-white rounded-2xl shadow-lg border border-slate-100 p-6 mb-6">
+            <div class="p-4 bg-slate-50 rounded-xl border border-dashed border-slate-300">
+                <div id="qr-reader shadow-inner"></div>
+            </div>
+            <div class="scanning-text flex items-center justify-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-indigo-600 animate-ping"></span>
+                Align tracking code within bounding window
+            </div>
+            <div class="text-center mt-5">
+                <button onclick="stopScanner()" class="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-semibold text-sm rounded-xl transition-all">Close Scanner Interface</button>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-md border border-slate-100 p-6 mb-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">📦 Current On-Hand Stock</h2>
+                <span id="totalItemsBadge" class="text-xs bg-slate-100 text-slate-600 px-2.5 py-1 rounded-md font-bold border border-slate-200">Metrics Real-Time</span>
+            </div>
+            <div id="stockList" class="space-y-2.5 max-h-[26rem] overflow-y-auto pr-1 custom-scroll"></div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-md border border-slate-100 p-6">
+            <h2 class="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">📊 Metric Export Center</h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3.5">
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">From Date</label>
+                    <input type="date" id="fromDate" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">To Date</label>
+                    <input type="date" id="toDate" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Action Filter</label>
+                    <select id="filterType" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option value="ALL">All Ledger Entries</option>
+                        <option value="Add">Add Transactions</option>
+                        <option value="Consume">Consume Transactions</option>
+                    </select>
+                </div>
+                <div class="flex items-end">
+                    <button onclick="exportCSV()" class="w-full p-3.5 bg-gradient-to-r from-fuchsia-600 to-purple-600 hover:from-fuchsia-700 hover:to-purple-700 active:scale-95 text-white font-bold text-sm rounded-xl shadow-md shadow-fuchsia-100 transition-all">
+                        Export CSV Ledger
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 
 <script>
-/* FIREBASE INIT */
+/* FIREBASE CONFIGURATION */
 firebase.initializeApp({
     apiKey: "AIzaSyBmXJZ6dm-SLzzIvz9P22kXI23MwdW3WC0",
     authDomain: "material-tracker-49dac.firebaseapp.com",
@@ -109,24 +164,23 @@ let html5QrCode = null;
 let isScanning = false;
 let logoutTimer;
 
-/* INACTIVITY TIMER (2 Minutes) */
+/* SESSION MANAGEMENT SYSTEM */
 function resetLogoutTimer() {
     clearTimeout(logoutTimer);
     if (auth.currentUser) {
         logoutTimer = setTimeout(() => {
             alert("Logged out due to 10 minutes of inactivity.");
             handleLogout();
-        }, 600000); // 120,000ms = 2 minutes
+        }, 600000); 
     }
 }
 
-// Listen for interactions to reset timer
 window.onload = resetLogoutTimer;
 document.onmousemove = resetLogoutTimer;
 document.onkeypress = resetLogoutTimer;
 document.onclick = resetLogoutTimer;
 
-/* AUTHENTICATION */
+/* IDENTITY SECURITY CONTROLS */
 function togglePassword() {
     const input = document.getElementById("loginPassword");
     const icon = document.getElementById("eyeIcon");
@@ -163,7 +217,7 @@ auth.onAuthStateChanged(user => {
     if (user) { loadData(); resetLogoutTimer(); }
 });
 
-/* INVENTORY LOGIC */
+/* RETRIEVAL AND PRESENTATION LOGIC */
 function loadData() {
     db.collection("materials").onSnapshot(s => { stock = {}; s.forEach(d => stock[d.id] = d.data().material); renderStock(); });
     db.collection("history").orderBy("date", "desc").onSnapshot(s => { history = []; s.forEach(d => history.push(d.data())); });
@@ -171,18 +225,52 @@ function loadData() {
 
 function renderStock() {
     const term = document.getElementById("searchInput").value.toLowerCase();
+    const sortBy = document.getElementById("sortStockSelect").value;
     let counted = {};
-    Object.values(stock).forEach(m => { if(m.toLowerCase().includes(term)) counted[m] = (counted[m] || 0) + 1; });
+    
+    Object.values(stock).forEach(m => { 
+        if(m.toLowerCase().includes(term)) counted[m] = (counted[m] || 0) + 1; 
+    });
+    
     const stockList = document.getElementById("stockList");
-    const entries = Object.entries(counted);
-    if (!entries.length) { stockList.innerHTML = `<div class='text-center py-8 text-gray-500'>No materials found</div>`; return; }
+    const totalItemsBadge = document.getElementById("totalItemsBadge");
+    let entries = Object.entries(counted);
+    
+    // Update structural status count metrics badge
+    totalItemsBadge.innerText = `${entries.length} Unique Materials`;
+    
+    if (!entries.length) { 
+        stockList.innerHTML = `
+            <div class='text-center py-12 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-slate-400 font-medium text-sm'>
+                🔍 No synchronized inventory lines found matching filter criteria
+            </div>`; 
+        return; 
+    }
+    
+    /* APPLY EXPLICIT SORT ROUTINES */
+    if (sortBy === "Alpha") {
+        entries.sort((a, b) => a[0].localeCompare(b[0]));
+    } else if (sortBy === "QtyDesc") {
+        entries.sort((a, b) => b[1] - a[1]);
+    } else if (sortBy === "QtyAsc") {
+        entries.sort((a, b) => a[1] - b[1]);
+    }
+    
     stockList.innerHTML = entries.map(([m, c], i) => `
-        <div class="flex justify-between items-center p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
-            <div class="flex items-center"><span class="w-8 h-8 flex items-center justify-center bg-blue-100 text-blue-800 rounded-full mr-3 font-medium">${i+1}</span><span class="text-gray-800">${m}</span></div>
-            <span class="bg-green-100 text-green-800 px-3 py-1 rounded-full font-medium">${c}</span>
+        <div class="flex justify-between items-center p-3.5 bg-white border border-slate-100 rounded-xl hover:shadow-md hover:border-slate-200 hover:-translate-y-0.5 transition-all duration-200 group">
+            <div class="flex items-center">
+                <span class="w-7 h-7 flex items-center justify-center bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-lg mr-3 text-xs font-bold shadow-sm group-hover:bg-indigo-600 group-hover:text-white group-hover:border-indigo-600 transition-colors">
+                    ${i+1}
+                </span>
+                <span class="text-slate-800 font-semibold tracking-tight text-sm">${m}</span>
+            </div>
+            <span class="bg-emerald-50 text-emerald-700 px-3.5 py-1.5 rounded-xl text-xs font-black tracking-wide border border-emerald-100 shadow-sm">
+                ${c} Pcs
+            </span>
         </div>`).join('');
 }
 
+/* HARDWARE PERIPHERAL & SCANNERS */
 async function startScanner(mode) {
     if (isScanning) { stopScanner(); setTimeout(() => startScanner(mode), 300); return; }
     currentScanMode = mode;
@@ -197,16 +285,16 @@ async function handleScan(serial, mode) {
     if (html5QrCode && isScanning) { await html5QrCode.stop(); isScanning = false; }
     document.getElementById('scannerSection').classList.add('hidden');
     serial = serial.trim().toUpperCase();
-    if (!serial.startsWith("ID")) return alert("Invalid QR");
+    if (!serial.startsWith("ID")) return alert("Invalid tracking serialization token framework syntax");
     if (mode === "add") {
-        if (stock[serial]) return alert("Already exists");
+        if (stock[serial]) return alert("Target serialization signature node matrix code already mapped inside runtime ecosystem registry");
         const name = prompt("Enter material name:");
         if (!name) return;
         await db.collection("materials").doc(serial).set({ material: name.trim() });
         await db.collection("history").add({ serial, material: name.trim(), type: "Add", date: new Date(), timestamp: firebase.firestore.FieldValue.serverTimestamp() });
     } else {
-        if (!stock[serial]) return alert("Not found");
-        if (confirm(`Remove ${stock[serial]}?`)) {
+        if (!stock[serial]) return alert("No associated item registry link recorded configuration matrix data signature lookup index mapping profiles matches specified entry identity profile");
+        if (confirm(`Confirm inventory modification withdrawal logic authorization action tracking sequence: Remove ${stock[serial]}?`)) {
             const name = stock[serial];
             await db.collection("materials").doc(serial).delete();
             await db.collection("history").add({ serial, material: name, type: "Consume", date: new Date(), timestamp: firebase.firestore.FieldValue.serverTimestamp() });
@@ -220,6 +308,7 @@ async function stopScanner() {
     document.getElementById('scannerSection').classList.add('hidden');
 }
 
+/* COMPILATION AND EXPORT PROCESSING ENGINE */
 function exportCSV() {
     const from = document.getElementById("fromDate").value;
     const to = document.getElementById("toDate").value;
@@ -238,8 +327,9 @@ function exportCSV() {
     XLSX.writeFile(wb, "Inventory_History.csv");
 }
 
+/* VECTOR GRAPHIC AND PORTABLE STORAGE PARSING UTILITIES */
 async function generateQR() {
-    const count = parseInt(prompt("How many QR?"));
+    const count = parseInt(prompt("Specify serial generation batch index limit value parameter structural scope size request metric:"));
     if (!count || count < 1) return;
     const snap = await db.collection("settings").doc("qr").get();
     let last = snap.exists ? (snap.data().lastNumber || 940) : 940;

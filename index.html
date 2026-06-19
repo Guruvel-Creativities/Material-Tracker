@@ -253,10 +253,18 @@ let currentScanMode = null;
 let html5QrCode = null;
 let isScanning = false;
 let logoutTimer;
-// Temporary parameters for modal flow
 let activeModalMaterial = "";
 let activeModalSerial = "";
 let confirmationPromiseResolve = null;
+
+/* UTILITY ENCODE & DECODE CONTROLS FOR FIRESTORE SAFETY */
+function encodeDocId(name) {
+    return name.toLowerCase().trim().replace(/\//g, "__slash__");
+}
+
+function decodeDocId(id) {
+    return id.replace(/__slash__/g, "/");
+}
 
 /* KEYBOARD SHORTCUT ENGINE INTERCEPTOR */
 function handleGlobalKey(event, submitCallback, cancelCallback) {
@@ -354,7 +362,15 @@ auth.onAuthStateChanged(user => {
 /* DATA MATRIX EXTENDS SYNC PIPELINES */
 function loadData() {
     db.collection("materials").onSnapshot(s => { stock = {}; s.forEach(d => stock[d.id] = d.data().material); renderActiveTab(); });
-    db.collection("prices").onSnapshot(s => { priceMatrix = {}; s.forEach(d => priceMatrix[d.id.toLowerCase().trim()] = d.data().rate); renderActiveTab(); });
+    db.collection("prices").onSnapshot(s => { 
+        priceMatrix = {}; 
+        s.forEach(d => {
+            // Decode back to regular text (replaces __slash__ back to /)
+            const decodedKey = decodeDocId(d.id);
+            priceMatrix[decodedKey] = d.data().rate; 
+        }); 
+        renderActiveTab(); 
+    });
     db.collection("history").orderBy("date", "desc").onSnapshot(s => { history = []; s.forEach(d => history.push(d.data())); });
 }
 
@@ -373,10 +389,10 @@ function renderStock() {
     const valuationBadge = document.getElementById("valuationBadge");
     let entries = Object.entries(counted);
 
-    // FIXED PARSING SYNTAX HERE
     entries.forEach(pair => {
         const mName = pair[0];
         const qty = pair[1];
+        // Dynamic lowercase matching logic check
         const matchingPrice = priceMatrix[mName.toLowerCase().trim()] || 0;
         totalValuation += (matchingPrice * qty);
     });
@@ -444,7 +460,7 @@ function renderPrices() {
         const actualValue = priceMatrix[name.toLowerCase().trim()];
         const viewRateDisplay = actualValue !== undefined ? `${actualValue} Rs` : `<span class="text-amber-500 font-medium">Click to set</span>`;
         return `
-        <div onclick="openEditPriceModal('${name}')" class="flex justify-between items-center p-3.5 bg-white border border-slate-100 rounded-xl hover:shadow-md hover:border-indigo-200 hover:bg-slate-50/50 cursor-pointer transition-all duration-200 group">
+        <div onclick="openEditPriceModal('${name.replace(/'/g, "\\'")}')" class="flex justify-between items-center p-3.5 bg-white border border-slate-100 rounded-xl hover:shadow-md hover:border-indigo-200 hover:bg-slate-50/50 cursor-pointer transition-all duration-200 group">
             <div class="flex items-center">
                  <span class="w-7 h-7 flex items-center justify-center bg-slate-100 text-slate-500 border border-slate-200 rounded-lg mr-3 text-xs font-bold shadow-sm group-hover:bg-indigo-50 group-hover:text-indigo-600 group-hover:border-indigo-100 transition-colors">
                     ${i+1}
@@ -504,20 +520,19 @@ async function submitPriceSave() {
     }
     
     if (!targetName) return alert("Material name cannot be left blank");
-    
-    // FIX: Replace all forward slashes with hyphens so Firestore doesn't break
-    targetName = targetName.replace(/\//g, "-");
-    
     const rateVal = parseFloat(document.getElementById("modalPriceRateInput").value.trim());
     if (isNaN(rateVal) || rateVal < 0) return alert("Provide a valid non-negative numerical rate.");
     
-    await db.collection("prices").doc(targetName.toLowerCase().trim()).set({ rate: rateVal });
+    // Safely encode slashes into valid database strings
+    const safeDocId = encodeDocId(targetName);
+    await db.collection("prices").doc(safeDocId).set({ rate: rateVal });
     closePriceModal();
 }
 
 async function submitPriceDelete() {
     if (activeModalMaterial && confirm(`Do you want to delete the price entry for ${activeModalMaterial}?`)) {
-        await db.collection("prices").doc(activeModalMaterial.toLowerCase().trim()).delete();
+        const safeDocId = encodeDocId(activeModalMaterial);
+        await db.collection("prices").doc(safeDocId).delete();
         closePriceModal();
     }
 }

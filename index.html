@@ -504,8 +504,13 @@ async function submitPriceSave() {
     }
     
     if (!targetName) return alert("Material name cannot be left blank");
+    
+    // FIX: Replace all forward slashes with hyphens so Firestore doesn't break
+    targetName = targetName.replace(/\//g, "-");
+    
     const rateVal = parseFloat(document.getElementById("modalPriceRateInput").value.trim());
     if (isNaN(rateVal) || rateVal < 0) return alert("Provide a valid non-negative numerical rate.");
+    
     await db.collection("prices").doc(targetName.toLowerCase().trim()).set({ rate: rateVal });
     closePriceModal();
 }

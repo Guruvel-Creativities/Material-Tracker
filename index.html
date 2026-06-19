@@ -98,11 +98,22 @@
                     </span>
                      <input id="searchInput" oninput="renderActiveTab()" placeholder="Search connected inventory materials..." class="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white text-sm font-medium transition-all">
                 </div>
-                <select id="sortStockSelect" onchange="renderActiveTab()" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white font-semibold text-sm text-slate-700 transition-all cursor-pointer">
-                    <option value="Alpha">🔤 Alphabetical (A-Z)</option>
-                    <option value="QtyDesc">📈 Metric: High to Low</option>
-                    <option value="QtyAsc">📉 Metric: Low to High</option>
-                </select>
+                <div id="stockSortWrapper">
+					<select id="sortStockSelect" onchange="renderActiveTab()" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white font-semibold text-sm text-slate-700 transition-all cursor-pointer">
+						<option value="Alpha">🔤 Alphabetical (A-Z)</option>
+						<option value="QtyDesc">📈 Metric: High to Low</option>
+						<option value="QtyAsc">📉 Metric: Low to High</option>
+					</select>
+</div>
+
+<div id="priceSortWrapper" class="hidden">
+    <select id="sortPriceSelect" onchange="renderPrices()" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white font-semibold text-sm text-slate-700 transition-all cursor-pointer">
+        <option value="Alpha">🔤 Alphabetical (A-Z)</option>
+        <option value="PriceDesc">💰 Price High → Low</option>
+        <option value="PriceAsc">💸 Price Low → High</option>
+        <option value="NoPrice">⚠️ No Price Set</option>
+    </select>
+</div>
             </div>
         </div>
 
@@ -280,21 +291,38 @@ function handleGlobalKey(event, submitCallback, cancelCallback) {
 /* TAB VIEW SYSTEM NAVIGATION */
 function switchTab(tabId) {
     currentTab = tabId;
-    
+
     const isStock = tabId === 'stock';
-    document.getElementById('viewStockContainer').classList.toggle('hidden', !isStock);
-    document.getElementById('viewPriceContainer').classList.toggle('hidden', isStock);
-    
+
+    document.getElementById('viewStockContainer')
+        .classList.toggle('hidden', !isStock);
+
+    document.getElementById('viewPriceContainer')
+        .classList.toggle('hidden', isStock);
+
+    document.getElementById('stockSortWrapper')
+        .classList.toggle('hidden', !isStock);
+
+    document.getElementById('priceSortWrapper')
+        .classList.toggle('hidden', isStock);
+
     const tabStock = document.getElementById('tabStock');
     const tabPrice = document.getElementById('tabPrice');
+
     if (isStock) {
-        tabStock.className = "py-2.5 px-4 font-bold text-sm text-indigo-600 border-b-2 border-indigo-600 transition-all";
-        tabPrice.className = "py-2.5 px-4 font-semibold text-sm text-slate-500 border-b-2 border-transparent hover:text-slate-700 transition-all";
+        tabStock.className =
+            "py-2.5 px-4 font-bold text-sm text-indigo-600 border-b-2 border-indigo-600 transition-all";
+
+        tabPrice.className =
+            "py-2.5 px-4 font-semibold text-sm text-slate-500 border-b-2 border-transparent hover:text-slate-700 transition-all";
     } else {
-        tabStock.className = "py-2.5 px-4 font-semibold text-sm text-slate-500 border-b-2 border-transparent hover:text-slate-700 transition-all";
-        tabPrice.className = "py-2.5 px-4 font-bold text-sm text-indigo-600 border-b-2 border-indigo-600 transition-all";
+        tabStock.className =
+            "py-2.5 px-4 font-semibold text-sm text-slate-500 border-b-2 border-transparent hover:text-slate-700 transition-all";
+
+        tabPrice.className =
+            "py-2.5 px-4 font-bold text-sm text-indigo-600 border-b-2 border-indigo-600 transition-all";
     }
-    
+
     renderActiveTab();
 }
 
@@ -447,7 +475,36 @@ function renderPrices() {
         dynamicNames.add(matchedStockName || name);
     });
     let entries = Array.from(dynamicNames).filter(name => name.toLowerCase().includes(term));
+    const sortMode =
+    document.getElementById("sortPriceSelect")?.value || "Alpha";
+
+if (sortMode === "Alpha") {
+
     entries.sort((a, b) => a.localeCompare(b));
+
+} else if (sortMode === "PriceDesc") {
+
+    entries.sort((a, b) => {
+        const pa = priceMatrix[a.toLowerCase().trim()] || 0;
+        const pb = priceMatrix[b.toLowerCase().trim()] || 0;
+        return pb - pa;
+    });
+
+} else if (sortMode === "PriceAsc") {
+
+    entries.sort((a, b) => {
+        const pa = priceMatrix[a.toLowerCase().trim()] || 0;
+        const pb = priceMatrix[b.toLowerCase().trim()] || 0;
+        return pa - pb;
+    });
+
+} else if (sortMode === "NoPrice") {
+
+    entries = entries.filter(
+        name => priceMatrix[name.toLowerCase().trim()] === undefined
+    );
+
+}
     if (!entries.length) {
         priceList.innerHTML = `
             <div class='text-center py-12 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-slate-400 font-medium text-sm'>

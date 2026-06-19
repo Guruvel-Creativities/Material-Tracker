@@ -244,19 +244,19 @@ firebase.initializeApp({
     authDomain: "material-tracker-49dac.firebaseapp.com",
     projectId: "material-tracker-49dac"
 });
-const db = firebase.firestore(); [cite: 48]
-const auth = firebase.auth(); [cite: 48]
+const db = firebase.firestore();
+const auth = firebase.auth();
 
-let stock = {}, priceMatrix = {}, history = []; [cite: 48]
-let currentTab = 'stock'; [cite: 49]
-let currentScanMode = null; [cite: 49]
-let html5QrCode = null; [cite: 49]
-let isScanning = false; [cite: 49]
-let logoutTimer; [cite: 49]
+let stock = {}, priceMatrix = {}, history = [];
+let currentTab = 'stock';
+let currentScanMode = null;
+let html5QrCode = null;
+let isScanning = false;
+let logoutTimer;
 // Temporary parameters for modal flow
-let activeModalMaterial = ""; [cite: 50]
-let activeModalSerial = ""; [cite: 50]
-let confirmationPromiseResolve = null; [cite: 50]
+let activeModalMaterial = "";
+let activeModalSerial = "";
+let confirmationPromiseResolve = null;
 
 /* KEYBOARD SHORTCUT ENGINE INTERCEPTOR */
 function handleGlobalKey(event, submitCallback, cancelCallback) {
@@ -270,133 +270,138 @@ function handleGlobalKey(event, submitCallback, cancelCallback) {
 }
 
 /* TAB VIEW SYSTEM NAVIGATION */
-function switchTab(tabId) { [cite: 51]
-    currentTab = tabId; [cite: 51]
+function switchTab(tabId) {
+    currentTab = tabId;
     
-    const isStock = tabId === 'stock'; [cite: 51]
-    document.getElementById('viewStockContainer').classList.toggle('hidden', !isStock); [cite: 52]
-    document.getElementById('viewPriceContainer').classList.toggle('hidden', isStock); [cite: 52]
+    const isStock = tabId === 'stock';
+    document.getElementById('viewStockContainer').classList.toggle('hidden', !isStock);
+    document.getElementById('viewPriceContainer').classList.toggle('hidden', isStock);
     
-    const tabStock = document.getElementById('tabStock'); [cite: 52]
-    const tabPrice = document.getElementById('tabPrice'); [cite: 52]
-    if (isStock) { [cite: 53]
-        tabStock.className = "py-2.5 px-4 font-bold text-sm text-indigo-600 border-b-2 border-indigo-600 transition-all"; [cite: 53]
-        tabPrice.className = "py-2.5 px-4 font-semibold text-sm text-slate-500 border-b-2 border-transparent hover:text-slate-700 transition-all"; [cite: 54]
-    } else { [cite: 55]
-        tabStock.className = "py-2.5 px-4 font-semibold text-sm text-slate-500 border-b-2 border-transparent hover:text-slate-700 transition-all"; [cite: 55]
-        tabPrice.className = "py-2.5 px-4 font-bold text-sm text-indigo-600 border-b-2 border-indigo-600 transition-all"; [cite: 56]
+    const tabStock = document.getElementById('tabStock');
+    const tabPrice = document.getElementById('tabPrice');
+    if (isStock) {
+        tabStock.className = "py-2.5 px-4 font-bold text-sm text-indigo-600 border-b-2 border-indigo-600 transition-all";
+        tabPrice.className = "py-2.5 px-4 font-semibold text-sm text-slate-500 border-b-2 border-transparent hover:text-slate-700 transition-all";
+    } else {
+        tabStock.className = "py-2.5 px-4 font-semibold text-sm text-slate-500 border-b-2 border-transparent hover:text-slate-700 transition-all";
+        tabPrice.className = "py-2.5 px-4 font-bold text-sm text-indigo-600 border-b-2 border-indigo-600 transition-all";
     }
     
-    renderActiveTab(); [cite: 56]
-} [cite: 57]
+    renderActiveTab();
+}
 
-function renderActiveTab() { [cite: 57]
-    if (currentTab === 'stock') { [cite: 57]
-        renderStock(); [cite: 57]
-    } else { [cite: 58]
-        renderPrices(); [cite: 58]
-    } [cite: 59]
-} [cite: 59]
+function renderActiveTab() {
+    if (currentTab === 'stock') {
+        renderStock();
+    } else {
+        renderPrices();
+    }
+}
 
 /* SESSION MANAGEMENT SYSTEM */
-function resetLogoutTimer() { [cite: 59]
-    clearTimeout(logoutTimer); [cite: 59]
-    if (auth.currentUser) { [cite: 60]
-        logoutTimer = setTimeout(() => { [cite: 60]
-            alert("Logged out due to 10 minutes of inactivity."); [cite: 60]
-            handleLogout(); [cite: 60]
-        }, 600000); [cite: 60]
-    } [cite: 61]
-} [cite: 61]
+function resetLogoutTimer() {
+    clearTimeout(logoutTimer);
+    if (auth.currentUser) {
+        logoutTimer = setTimeout(() => {
+            alert("Logged out due to 10 minutes of inactivity.");
+            handleLogout();
+        }, 600000);
+    }
+}
 
-window.onload = resetLogoutTimer; [cite: 61]
-document.onmousemove = resetLogoutTimer; [cite: 61]
-document.onkeypress = resetLogoutTimer; [cite: 61]
-document.onclick = resetLogoutTimer; [cite: 61]
+window.onload = resetLogoutTimer;
+document.onmousemove = resetLogoutTimer;
+document.onkeypress = resetLogoutTimer;
+document.onclick = resetLogoutTimer;
 
 /* IDENTITY SECURITY CONTROLS */
-function togglePassword() { [cite: 62]
-    const input = document.getElementById("loginPassword"); [cite: 62]
-    const icon = document.getElementById("eyeIcon"); [cite: 62]
-    if (input.type === "password") { [cite: 63]
-        input.type = "text"; [cite: 63]
-        icon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />`; [cite: 64]
-    } else { [cite: 65]
-        input.type = "password"; [cite: 65]
-        icon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />`; [cite: 66]
-    } [cite: 67]
-} [cite: 67]
+function togglePassword() {
+    const input = document.getElementById("loginPassword");
+    const icon = document.getElementById("eyeIcon");
+    if (input.type === "password") {
+        input.type = "text";
+        icon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" />`;
+    } else {
+        input.type = "password";
+        icon.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />`;
+    }
+}
 
-function handleLogin() { [cite: 67]
-    const email = document.getElementById("loginEmail").value; [cite: 67]
-    const pass = document.getElementById("loginPassword").value; [cite: 67]
-    const btn = document.getElementById("loginBtn"); [cite: 67]
-    const err = document.getElementById("loginError"); [cite: 68]
-    if (!email || !pass) return alert("Please fill fields"); [cite: 68]
-    btn.disabled = true; btn.innerText = "Signing in..."; [cite: 68]
-    auth.signInWithEmailAndPassword(email, pass).catch(e => { [cite: 69]
-        btn.disabled = false; btn.innerText = "Sign In"; [cite: 69]
-        err.innerText = e.message; err.classList.remove("hidden"); [cite: 69]
-    }); [cite: 70]
-} [cite: 70]
+function handleLogin() {
+    const email = document.getElementById("loginEmail").value;
+    const pass = document.getElementById("loginPassword").value;
+    const btn = document.getElementById("loginBtn");
+    const err = document.getElementById("loginError");
+    if (!email || !pass) return alert("Please fill fields");
+    btn.disabled = true; btn.innerText = "Signing in...";
+    auth.signInWithEmailAndPassword(email, pass).catch(e => {
+        btn.disabled = false; btn.innerText = "Sign In";
+        err.innerText = e.message; err.classList.remove("hidden");
+    });
+}
 
-function handleLogout() { [cite: 70]
-    auth.signOut(); [cite: 70]
-    clearTimeout(logoutTimer); [cite: 70]
-} [cite: 70]
+function handleLogout() {
+    auth.signOut();
+    clearTimeout(logoutTimer);
+}
 
-auth.onAuthStateChanged(user => { [cite: 70]
-    document.getElementById("loginPage").classList.toggle("hidden", !!user); [cite: 70]
-    document.getElementById("mainApp").classList.toggle("hidden", !user); [cite: 70]
-    if (user) { loadData(); resetLogoutTimer(); } [cite: 70]
-}); [cite: 70]
+auth.onAuthStateChanged(user => {
+    document.getElementById("loginPage").classList.toggle("hidden", !!user);
+    document.getElementById("mainApp").classList.toggle("hidden", !user);
+    if (user) { loadData(); resetLogoutTimer(); }
+});
 
 /* DATA MATRIX EXTENDS SYNC PIPELINES */
-function loadData() { [cite: 71]
-    db.collection("materials").onSnapshot(s => { stock = {}; s.forEach(d => stock[d.id] = d.data().material); renderActiveTab(); }); [cite: 71]
-    db.collection("prices").onSnapshot(s => { priceMatrix = {}; s.forEach(d => priceMatrix[d.id.toLowerCase().trim()] = d.data().rate); renderActiveTab(); }); [cite: 72]
-    db.collection("history").orderBy("date", "desc").onSnapshot(s => { history = []; s.forEach(d => history.push(d.data())); }); [cite: 73]
-} [cite: 74]
+function loadData() {
+    db.collection("materials").onSnapshot(s => { stock = {}; s.forEach(d => stock[d.id] = d.data().material); renderActiveTab(); });
+    db.collection("prices").onSnapshot(s => { priceMatrix = {}; s.forEach(d => priceMatrix[d.id.toLowerCase().trim()] = d.data().rate); renderActiveTab(); });
+    db.collection("history").orderBy("date", "desc").onSnapshot(s => { history = []; s.forEach(d => history.push(d.data())); });
+}
 
 /* STOCK LEDGER VIEW */
-function renderStock() { [cite: 74]
-    const term = document.getElementById("searchInput").value.toLowerCase(); [cite: 74]
-    const sortBy = document.getElementById("sortStockSelect").value; [cite: 74]
-    let counted = {}; [cite: 75]
-    let totalValuation = 0; [cite: 75]
+function renderStock() {
+    const term = document.getElementById("searchInput").value.toLowerCase();
+    const sortBy = document.getElementById("sortStockSelect").value;
+    let counted = {};
+    let totalValuation = 0;
     
-    Object.values(stock).forEach(m => { [cite: 75]
-        if(m.toLowerCase().includes(term)) counted[m] = (counted[m] || 0) + 1; [cite: 75]
-    }); [cite: 75]
-    const stockList = document.getElementById("stockList"); [cite: 76]
-    const totalItemsBadge = document.getElementById("totalItemsBadge"); [cite: 76]
-    const valuationBadge = document.getElementById("valuationBadge"); [cite: 76]
-    let entries = Object.entries(counted); [cite: 76]
-    Object.entries(counted).forEach(([m, qty]) => { [cite: 77]
-        const matchingPrice = priceMatrix[m.toLowerCase().trim()] || 0; [cite: 77]
-        totalValuation += (matchingPrice * qty); [cite: 77]
-    }); [cite: 77]
-    totalItemsBadge.innerText = `${entries.length} Unique Materials`; [cite: 78]
-    valuationBadge.innerText = `Valuation: ${totalValuation} Rs`; [cite: 78]
-    if (!entries.length) { [cite: 79]
+    Object.values(stock).forEach(m => {
+        if(m.toLowerCase().includes(term)) counted[m] = (counted[m] || 0) + 1;
+    });
+    const stockList = document.getElementById("stockList");
+    const totalItemsBadge = document.getElementById("totalItemsBadge");
+    const valuationBadge = document.getElementById("valuationBadge");
+    let entries = Object.entries(counted);
+
+    // FIXED PARSING SYNTAX HERE
+    entries.forEach(pair => {
+        const mName = pair[0];
+        const qty = pair[1];
+        const matchingPrice = priceMatrix[mName.toLowerCase().trim()] || 0;
+        totalValuation += (matchingPrice * qty);
+    });
+
+    totalItemsBadge.innerText = `${entries.length} Unique Materials`;
+    valuationBadge.innerText = `Valuation: ${totalValuation} Rs`;
+    if (!entries.length) {
         stockList.innerHTML = `
             <div class='text-center py-12 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-slate-400 font-medium text-sm'>
                 🔍 No materials found matching filter criteria
-            </div>`; [cite: 79]
-        return; [cite: 80]
+            </div>`;
+        return;
     }
     
-    if (sortBy === "Alpha") { [cite: 80]
-        entries.sort((a, b) => a[0].localeCompare(b[0])); [cite: 80]
-    } else if (sortBy === "QtyDesc") { [cite: 81]
-        entries.sort((a, b) => b[1] - a[1]); [cite: 81]
-    } else if (sortBy === "QtyAsc") { [cite: 82]
-        entries.sort((a, b) => a[1] - b[1]); [cite: 82]
+    if (sortBy === "Alpha") {
+        entries.sort((a, b) => a[0].localeCompare(b[0]));
+    } else if (sortBy === "QtyDesc") {
+        entries.sort((a, b) => b[1] - a[1]);
+    } else if (sortBy === "QtyAsc") {
+        entries.sort((a, b) => a[1] - b[1]);
     }
     
-    stockList.innerHTML = entries.map(([m, c], i) => { [cite: 83]
-        const itemPrice = priceMatrix[m.toLowerCase().trim()]; [cite: 83]
-        const displayPrice = itemPrice !== undefined ? `${itemPrice} Rs/Unit` : `No Price Set`; [cite: 83]
+    stockList.innerHTML = entries.map(([m, c], i) => {
+        const itemPrice = priceMatrix[m.toLowerCase().trim()];
+        const displayPrice = itemPrice !== undefined ? `${itemPrice} Rs/Unit` : `No Price Set`;
         return `
         <div class="flex justify-between items-center p-3.5 bg-white border border-slate-100 rounded-xl hover:shadow-md hover:border-slate-200 hover:-translate-y-0.5 transition-all duration-200 group">
             <div class="flex items-center">
@@ -411,33 +416,33 @@ function renderStock() { [cite: 74]
             <span class="bg-emerald-50 text-emerald-700 px-3.5 py-1.5 rounded-xl text-xs font-black tracking-wide border border-emerald-100 shadow-sm">
                 ${c} Units
              </span>
-        </div>`; [cite: 86]
-    }).join(''); [cite: 86]
-} [cite: 87]
+        </div>`;
+    }).join('');
+}
 
 /* PRICE CONFIGURATION MODAL DISPATCH LOGIC */
-function renderPrices() { [cite: 87]
-    const term = document.getElementById("searchInput").value.toLowerCase(); [cite: 87]
-    const priceList = document.getElementById("priceList"); [cite: 87]
-    let dynamicNames = new Set(); [cite: 88]
-    Object.values(stock).forEach(name => dynamicNames.add(name.trim())); [cite: 88]
-    Object.keys(priceMatrix).forEach(name => { [cite: 88]
-        const matchedStockName = Object.values(stock).find(s => s.toLowerCase().trim() === name.toLowerCase().trim()); [cite: 88]
-        dynamicNames.add(matchedStockName || name); [cite: 88]
-    }); [cite: 88]
-    let entries = Array.from(dynamicNames).filter(name => name.toLowerCase().includes(term)); [cite: 89]
-    entries.sort((a, b) => a.localeCompare(b)); [cite: 89]
-    if (!entries.length) { [cite: 90]
+function renderPrices() {
+    const term = document.getElementById("searchInput").value.toLowerCase();
+    const priceList = document.getElementById("priceList");
+    let dynamicNames = new Set();
+    Object.values(stock).forEach(name => dynamicNames.add(name.trim()));
+    Object.keys(priceMatrix).forEach(name => {
+        const matchedStockName = Object.values(stock).find(s => s.toLowerCase().trim() === name.toLowerCase().trim());
+        dynamicNames.add(matchedStockName || name);
+    });
+    let entries = Array.from(dynamicNames).filter(name => name.toLowerCase().includes(term));
+    entries.sort((a, b) => a.localeCompare(b));
+    if (!entries.length) {
         priceList.innerHTML = `
             <div class='text-center py-12 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-slate-400 font-medium text-sm'>
                 🔍 No active materials indexed inside workspace profile
-            </div>`; [cite: 90]
-        return; [cite: 91]
+            </div>`;
+        return;
     }
     
-    priceList.innerHTML = entries.map((name, i) => { [cite: 91]
-        const actualValue = priceMatrix[name.toLowerCase().trim()]; [cite: 91]
-        const viewRateDisplay = actualValue !== undefined ? `${actualValue} Rs` : `<span class="text-amber-500 font-medium">Click to set</span>`; [cite: 91]
+    priceList.innerHTML = entries.map((name, i) => {
+        const actualValue = priceMatrix[name.toLowerCase().trim()];
+        const viewRateDisplay = actualValue !== undefined ? `${actualValue} Rs` : `<span class="text-amber-500 font-medium">Click to set</span>`;
         return `
         <div onclick="openEditPriceModal('${name}')" class="flex justify-between items-center p-3.5 bg-white border border-slate-100 rounded-xl hover:shadow-md hover:border-indigo-200 hover:bg-slate-50/50 cursor-pointer transition-all duration-200 group">
             <div class="flex items-center">
@@ -451,222 +456,219 @@ function renderPrices() { [cite: 87]
                     ${viewRateDisplay}
                 </span>
             </div>
-        </div>`; [cite: 93]
-    }).join(''); [cite: 94]
-} [cite: 100]
+        </div>`;
+    }).join('');
+}
 
 /* NATIVE IN-APP MODAL WINDOW WORKFLOWS */
-function openEditPriceModal(materialName) { [cite: 94]
-    activeModalMaterial = materialName; [cite: 94]
-    const currentRate = priceMatrix[materialName.toLowerCase().trim()] || ""; [cite: 95]
+function openEditPriceModal(materialName) {
+    activeModalMaterial = materialName;
+    const currentRate = priceMatrix[materialName.toLowerCase().trim()] || "";
     
-    document.getElementById("modalPriceTitle").innerText = "Update Unit Rate"; [cite: 95]
-    document.getElementById("modalPriceSubtitle").innerText = `Configure item cost metrics for: ${materialName}`; [cite: 95]
-    document.getElementById("modalPriceNameField").classList.add("hidden"); [cite: 95]
-    const deleteBtn = document.getElementById("modalPriceDeleteBtn"); [cite: 96]
-    if (currentRate !== "") deleteBtn.classList.remove("hidden"); [cite: 96]
-    else deleteBtn.classList.add("hidden"); [cite: 96]
+    document.getElementById("modalPriceTitle").innerText = "Update Unit Rate";
+    document.getElementById("modalPriceSubtitle").innerText = `Configure item cost metrics for: ${materialName}`;
+    document.getElementById("modalPriceNameField").classList.add("hidden");
+    const deleteBtn = document.getElementById("modalPriceDeleteBtn");
+    if (currentRate !== "") deleteBtn.classList.remove("hidden");
+    else deleteBtn.classList.add("hidden");
     
-    const rateInput = document.getElementById("modalPriceRateInput"); [cite: 96]
-    rateInput.value = currentRate; [cite: 96]
+    const rateInput = document.getElementById("modalPriceRateInput");
+    rateInput.value = currentRate;
     
-    document.getElementById("modalPriceOverlay").classList.remove("hidden"); [cite: 96]
-    rateInput.focus(); [cite: 96]
-} [cite: 97]
+    document.getElementById("modalPriceOverlay").classList.remove("hidden");
+    rateInput.focus();
+}
 
-function openNewPriceModal() { [cite: 97]
-    activeModalMaterial = ""; [cite: 97]
-    document.getElementById("modalPriceTitle").innerText = "Set New Price Line"; [cite: 97]
-    document.getElementById("modalPriceSubtitle").innerText = "Assign financial baseline values to an independent item type"; [cite: 98]
-    document.getElementById("modalPriceNameField").classList.remove("hidden"); [cite: 98]
-    document.getElementById("modalPriceDeleteBtn").classList.add("hidden"); [cite: 98]
+function openNewPriceModal() {
+    activeModalMaterial = "";
+    document.getElementById("modalPriceTitle").innerText = "Set New Price Line";
+    document.getElementById("modalPriceSubtitle").innerText = "Assign financial baseline values to an independent item type";
+    document.getElementById("modalPriceNameField").classList.remove("hidden");
+    document.getElementById("modalPriceDeleteBtn").classList.add("hidden");
     
-    document.getElementById("modalPriceMatNameInput").value = ""; [cite: 98]
-    document.getElementById("modalPriceRateInput").value = ""; [cite: 98]
+    document.getElementById("modalPriceMatNameInput").value = "";
+    document.getElementById("modalPriceRateInput").value = "";
     
-    document.getElementById("modalPriceOverlay").classList.remove("hidden"); [cite: 98]
-    document.getElementById("modalPriceMatNameInput").focus(); [cite: 99]
-} [cite: 100]
+    document.getElementById("modalPriceOverlay").classList.remove("hidden");
+    document.getElementById("modalPriceMatNameInput").focus();
+}
 
-function closePriceModal() { [cite: 99]
-    document.getElementById("modalPriceOverlay").classList.add("hidden"); [cite: 99]
-} [cite: 100]
+function closePriceModal() {
+    document.getElementById("modalPriceOverlay").classList.add("hidden");
+}
 
-async function submitPriceSave() { [cite: 100]
-    let targetName = activeModalMaterial; [cite: 100]
-    if (!targetName) { [cite: 100]
-        targetName = document.getElementById("modalPriceMatNameInput").value.trim(); [cite: 100]
-    } [cite: 101]
+async function submitPriceSave() {
+    let targetName = activeModalMaterial;
+    if (!targetName) {
+        targetName = document.getElementById("modalPriceMatNameInput").value.trim();
+    }
     
-    if (!targetName) return alert("Material name cannot be left blank"); [cite: 101]
-    const rateVal = parseFloat(document.getElementById("modalPriceRateInput").value.trim()); [cite: 102]
-    if (isNaN(rateVal) || rateVal < 0) return alert("Provide a valid non-negative numerical rate."); [cite: 102]
-    await db.collection("prices").doc(targetName.toLowerCase().trim()).set({ rate: rateVal }); [cite: 103]
-    closePriceModal(); [cite: 103]
-} [cite: 104]
+    if (!targetName) return alert("Material name cannot be left blank");
+    const rateVal = parseFloat(document.getElementById("modalPriceRateInput").value.trim());
+    if (isNaN(rateVal) || rateVal < 0) return alert("Provide a valid non-negative numerical rate.");
+    await db.collection("prices").doc(targetName.toLowerCase().trim()).set({ rate: rateVal });
+    closePriceModal();
+}
 
-async function submitPriceDelete() { [cite: 104]
-    if (activeModalMaterial && confirm(`Do you want to delete the price entry for ${activeModalMaterial}?`)) { [cite: 104]
-        await db.collection("prices").doc(activeModalMaterial.toLowerCase().trim()).delete(); [cite: 104]
-        closePriceModal(); [cite: 104]
-    } [cite: 104]
-} [cite: 104]
+async function submitPriceDelete() {
+    if (activeModalMaterial && confirm(`Do you want to delete the price entry for ${activeModalMaterial}?`)) {
+        await db.collection("prices").doc(activeModalMaterial.toLowerCase().trim()).delete();
+        closePriceModal();
+    }
+}
 
-// Custom Promises for intercepting Scan Logic flows inside DOM panels
-function openConfirmModal(message) { [cite: 104]
-    document.getElementById("modalConfirmBody").innerText = message; [cite: 104]
-    document.getElementById("modalConfirmOverlay").classList.remove("hidden"); [cite: 105]
-    return new Promise((resolve) => { [cite: 105]
-        confirmationPromiseResolve = resolve; [cite: 105]
-    }); [cite: 105]
-} [cite: 106]
+function openConfirmModal(message) {
+    document.getElementById("modalConfirmBody").innerText = message;
+    document.getElementById("modalConfirmOverlay").classList.remove("hidden");
+    return new Promise((resolve) => {
+        confirmationPromiseResolve = resolve;
+    });
+}
 
-function closeConfirmModal(outcome) { [cite: 106]
-    document.getElementById("modalConfirmOverlay").classList.add("hidden"); [cite: 106]
-    if (confirmationPromiseResolve) confirmationPromiseResolve(outcome); [cite: 106]
-} [cite: 107]
+function closeConfirmModal(outcome) {
+    document.getElementById("modalConfirmOverlay").classList.add("hidden");
+    if (confirmationPromiseResolve) confirmationPromiseResolve(outcome);
+}
 
-function openAddNameModal(serial) { [cite: 107]
-    activeModalSerial = serial; [cite: 107]
-    document.getElementById("modalAddNameSerialTxt").innerText = `Serial Token: ${serial}`; [cite: 107]
-    document.getElementById("modalAddMatNameInput").value = ""; [cite: 107]
-    document.getElementById("modalAddNameOverlay").classList.remove("hidden"); [cite: 107]
-    document.getElementById("modalAddMatNameInput").focus(); [cite: 107]
-    return new Promise((resolve) => { [cite: 108]
-        confirmationPromiseResolve = resolve; [cite: 108]
-    }); [cite: 108]
-} [cite: 109]
+function openAddNameModal(serial) {
+    activeModalSerial = serial;
+    document.getElementById("modalAddNameSerialTxt").innerText = `Serial Token: ${serial}`;
+    document.getElementById("modalAddMatNameInput").value = "";
+    document.getElementById("modalAddNameOverlay").classList.remove("hidden");
+    document.getElementById("modalAddMatNameInput").focus();
+    return new Promise((resolve) => {
+        confirmationPromiseResolve = resolve;
+    });
+}
 
-function closeAddNameModal() { [cite: 109]
-    document.getElementById("modalAddNameOverlay").classList.add("hidden"); [cite: 109]
-    if (confirmationPromiseResolve) confirmationPromiseResolve(null); [cite: 109]
-} [cite: 110]
+function closeAddNameModal() {
+    document.getElementById("modalAddNameOverlay").classList.add("hidden");
+    if (confirmationPromiseResolve) confirmationPromiseResolve(null);
+}
 
-async function submitAddNameSave() { [cite: 110]
-    const enteredName = document.getElementById("modalAddMatNameInput").value.trim(); [cite: 110]
-    if (!enteredName) return alert("Name entry is required."); [cite: 110]
+async function submitAddNameSave() {
+    const enteredName = document.getElementById("modalAddMatNameInput").value.trim();
+    if (!enteredName) return alert("Name entry is required.");
     
-    document.getElementById("modalAddNameOverlay").classList.add("hidden"); [cite: 110]
-    if (confirmationPromiseResolve) confirmationPromiseResolve(enteredName); [cite: 111]
-} [cite: 112]
+    document.getElementById("modalAddNameOverlay").classList.add("hidden");
+    if (confirmationPromiseResolve) confirmationPromiseResolve(enteredName);
+}
 
-function openQRCountModal() { [cite: 112]
-    document.getElementById("modalQRGenOverlay").classList.remove("hidden"); [cite: 112]
-    document.getElementById("modalQRCountInput").focus(); [cite: 112]
-} [cite: 112]
-function closeQRCountModal() { [cite: 112]
-    document.getElementById("modalQRGenOverlay").classList.add("hidden"); [cite: 112]
-} [cite: 112]
-function submitQRGeneration() { [cite: 112]
-    const val = parseInt(document.getElementById("modalQRCountInput").value); [cite: 112]
-    closeQRCountModal(); [cite: 112]
-    if(val && val > 0) runQRGenerationEngine(val); [cite: 113]
-} [cite: 113]
+function openQRCountModal() {
+    document.getElementById("modalQRGenOverlay").classList.remove("hidden");
+    document.getElementById("modalQRCountInput").focus();
+}
+function closeQRCountModal() {
+    document.getElementById("modalQRGenOverlay").classList.add("hidden");
+}
+function submitQRGeneration() {
+    const val = parseInt(document.getElementById("modalQRCountInput").value);
+    closeQRCountModal();
+    if(val && val > 0) runQRGenerationEngine(val);
+}
 
 /* HARDWARE PERIPHERAL & SCANNERS */
-async function startScanner(mode) { [cite: 113]
-    if (isScanning) { [cite: 113]
-        await stopScanner(); [cite: 113]
-        setTimeout(() => startScanner(mode), 300); [cite: 114]
-        return; [cite: 114]
+async function startScanner(mode) {
+    if (isScanning) {
+        await stopScanner();
+        setTimeout(() => startScanner(mode), 300);
+        return;
     }
     
-    currentScanMode = mode; [cite: 114]
-    document.getElementById('scannerSection').classList.remove('hidden'); [cite: 114]
-    setTimeout(async () => { [cite: 115]
+    currentScanMode = mode;
+    document.getElementById('scannerSection').classList.remove('hidden');
+    setTimeout(async () => {
         try {
-            html5QrCode = new Html5Qrcode("qr-reader"); [cite: 115]
-            const config = { fps: 15, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 }; [cite: 115]
+            html5QrCode = new Html5Qrcode("qr-reader");
+            const config = { fps: 15, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 };
             
-            await html5QrCode.start({ facingMode: "environment" }, config, (text) => handleScan(text, mode)); [cite: 115]
-            isScanning = true; [cite: 115]
+            await html5QrCode.start({ facingMode: "environment" }, config, (text) => handleScan(text, mode));
+            isScanning = true;
         } catch (err) {
-            console.warn("Camera fallback route trigger activated.", err); [cite: 116]
+            console.warn("Camera fallback route trigger activated.", err);
             try {
-                await html5QrCode.start({ facingMode: "user" }, config, (text) => handleScan(text, mode)); [cite: 116]
-                isScanning = true; [cite: 116]
-            } catch (fallbackErr) { [cite: 116]
-                alert("Camera access error: Check your browser permission settings."); [cite: 117]
-                document.getElementById('scannerSection').classList.add('hidden'); [cite: 117]
+                await html5QrCode.start({ facingMode: "user" }, config, (text) => handleScan(text, mode));
+                isScanning = true;
+            } catch (fallbackErr) {
+                alert("Camera access error: Check your browser permission settings.");
+                document.getElementById('scannerSection').classList.add('hidden');
             }
         }
-    }, 150); [cite: 118]
-} [cite: 118]
+    }, 150);
+}
 
-async function handleScan(serial, mode) { [cite: 118]
-    serial = serial.trim().toUpperCase(); [cite: 118]
-    if (!serial.startsWith("ID")) return alert("Invalid QR"); [cite: 118]
-    if (html5QrCode && isScanning) await stopScanner(); [cite: 119]
+async function handleScan(serial, mode) {
+    serial = serial.trim().toUpperCase();
+    if (!serial.startsWith("ID")) return alert("Invalid QR");
+    if (html5QrCode && isScanning) await stopScanner();
     
-    if (mode === "add") { [cite: 119]
-        if (stock[serial]) return alert("Already exists"); [cite: 119]
-        // Wait for the native modern modal instead of a browser prompt box
-        const name = await openAddNameModal(serial); [cite: 120]
-        if (!name) return; [cite: 121]
+    if (mode === "add") {
+        if (stock[serial]) return alert("Already exists");
+        const name = await openAddNameModal(serial);
+        if (!name) return;
         
-        await db.collection("materials").doc(serial).set({ material: name }); [cite: 121]
-        await db.collection("history").add({ serial, material: name, type: "Add", date: new Date(), timestamp: firebase.firestore.FieldValue.serverTimestamp() }); [cite: 121]
-    } else { [cite: 122]
-        if (!stock[serial]) return alert("Not found"); [cite: 122]
-        // Intercept action via custom in-app choice container confirmation modal
-        const confirmDelete = await openConfirmModal(`Are you sure you want to withdraw ${stock[serial]} from active inventory storage limits?`); [cite: 123]
-        if (confirmDelete) { [cite: 124]
-            const name = stock[serial]; [cite: 124]
-            await db.collection("materials").doc(serial).delete(); [cite: 124]
-            await db.collection("history").add({ serial, material: name, type: "Consume", date: new Date(), timestamp: firebase.firestore.FieldValue.serverTimestamp() }); [cite: 125]
-        } [cite: 126]
+        await db.collection("materials").doc(serial).set({ material: name });
+        await db.collection("history").add({ serial, material: name, type: "Add", date: new Date(), timestamp: firebase.firestore.FieldValue.serverTimestamp() });
+    } else {
+        if (!stock[serial]) return alert("Not found");
+        const confirmDelete = await openConfirmModal(`Are you sure you want to withdraw ${stock[serial]} from active inventory storage limits?`);
+        if (confirmDelete) {
+            const name = stock[serial];
+            await db.collection("materials").doc(serial).delete();
+            await db.collection("history").add({ serial, material: name, type: "Consume", date: new Date(), timestamp: firebase.firestore.FieldValue.serverTimestamp() });
+        }
     }
-} [cite: 126]
+}
 
-async function stopScanner() { [cite: 126]
-    if (html5QrCode) { [cite: 126]
-        try { [cite: 126]
-            if (html5QrCode.isScanning) await html5QrCode.stop(); [cite: 126]
-            html5QrCode.clear(); [cite: 127]
-        } catch(e) { console.error(e); } [cite: 127]
+async function stopScanner() {
+    if (html5QrCode) {
+        try {
+            if (html5QrCode.isScanning) await html5QrCode.stop();
+            html5QrCode.clear();
+        } catch(e) { console.error(e); }
     }
-    isScanning = false; [cite: 127]
-    document.getElementById('scannerSection').classList.add('hidden'); [cite: 127]
-} [cite: 128]
+    isScanning = false;
+    document.getElementById('scannerSection').classList.add('hidden');
+}
 
 /* COMPILATION AND EXPORT PROCESSING ENGINE */
-function exportCSV() { [cite: 128]
-    const from = document.getElementById("fromDate").value; [cite: 128]
-    const to = document.getElementById("toDate").value; [cite: 128]
-    const filter = document.getElementById("filterType").value; [cite: 129]
-    let rows = [["Serial", "Material", "Type", "Date"]]; [cite: 129]
-    history.filter(e => { [cite: 130]
-        let m = (filter === "ALL" || e.type === filter); [cite: 130]
-        const d = new Date(e.date.seconds * 1000); [cite: 130]
-        if (from) m = m && d >= new Date(from); [cite: 130]
-        if (to) m = m && d <= new Date(to + "T23:59:59"); [cite: 130]
-        return m; [cite: 130]
-    }).forEach(e => rows.push([e.serial, e.material, e.type, new Date(e.date.seconds * 1000).toLocaleString()])); [cite: 130]
-    const ws = XLSX.utils.aoa_to_sheet(rows); [cite: 131]
-    const wb = XLSX.utils.book_new(); [cite: 131]
-    XLSX.utils.book_append_sheet(wb, ws, "Inventory"); [cite: 131]
-    XLSX.writeFile(wb, "Inventory_History.csv"); [cite: 131]
-} [cite: 132]
+function exportCSV() {
+    const from = document.getElementById("fromDate").value;
+    const to = document.getElementById("toDate").value;
+    const filter = document.getElementById("filterType").value;
+    let rows = [["Serial", "Material", "Type", "Date"]];
+    history.filter(e => {
+        let m = (filter === "ALL" || e.type === filter);
+        const d = new Date(e.date.seconds * 1000);
+        if (from) m = m && d >= new Date(from);
+        if (to) m = m && d <= new Date(to + "T23:59:59");
+        return m;
+    }).forEach(e => rows.push([e.serial, e.material, e.type, new Date(e.date.seconds * 1000).toLocaleString()]));
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Inventory");
+    XLSX.writeFile(wb, "Inventory_History.csv");
+}
 
 /* VECTOR GRAPHIC GENERATION */
-async function runQRGenerationEngine(count) { [cite: 132]
-    const snap = await db.collection("settings").doc("qr").get(); [cite: 132]
-    let last = snap.exists ? (snap.data().lastNumber || 940) : 940; [cite: 133]
-    const { jsPDF } = window.jspdf; [cite: 133]
-    const pdf = new jsPDF({ unit: "mm", format: [100, 150] }); [cite: 134]
-    let x=5, y=5, col=0; [cite: 134]
-    for (let i=1; i<=count; i++) { [cite: 135]
-        const id = "ID" + String(++last).padStart(3, "0"); [cite: 135]
-        const canvas = document.createElement("canvas"); [cite: 136]
-        await QRCode.toCanvas(canvas, id, { width: 88, margin: 1 }); [cite: 136]
-        pdf.addImage(canvas, "PNG", x, y, 22, 22); [cite: 136]
-        pdf.setFontSize(8); [cite: 136]
-        pdf.text(id, x + 11, y + 25, { align: "center" }); [cite: 137]
-        col++; if (col < 4) x += 24; [cite: 137]
-        else { col=0; x=5; y+=35; if(y>120){ pdf.addPage(); y=5; } } [cite: 138]
+async function runQRGenerationEngine(count) {
+    const snap = await db.collection("settings").doc("qr").get();
+    let last = snap.exists ? (snap.data().lastNumber || 940) : 940;
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ unit: "mm", format: [100, 150] });
+    let x=5, y=5, col=0;
+    for (let i=1; i<=count; i++) {
+        const id = "ID" + String(++last).padStart(3, "0");
+        const canvas = document.createElement("canvas");
+        await QRCode.toCanvas(canvas, id, { width: 88, margin: 1 });
+        pdf.addImage(canvas, "PNG", x, y, 22, 22);
+        pdf.setFontSize(8);
+        pdf.text(id, x + 11, y + 25, { align: "center" });
+        col++; if (col < 4) x += 24;
+        else { col=0; x=5; y+=35; if(y>120){ pdf.addPage(); y=5; } }
     }
-    pdf.save("QR_Codes.pdf"); [cite: 138]
-    await db.collection("settings").doc("qr").set({ lastNumber: last }); [cite: 139]
+    pdf.save("QR_Codes.pdf");
+    await db.collection("settings").doc("qr").set({ lastNumber: last });
 }
 
 window.addEventListener('beforeunload', stopScanner);

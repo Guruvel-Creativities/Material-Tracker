@@ -459,8 +459,12 @@ function renderPrices() {
     priceList.innerHTML = entries.map((name, i) => {
         const actualValue = priceMatrix[name.toLowerCase().trim()];
         const viewRateDisplay = actualValue !== undefined ? `${actualValue} Rs` : `<span class="text-amber-500 font-medium">Click to set</span>`;
+        
+        // FIX: Use attribute-safe encoding for the HTML dataset to prevent broken quotes
+        const safeAttributeName = name.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        
         return `
-        <div onclick="openEditPriceModal('${name.replace(/'/g, "\\'")}')" class="flex justify-between items-center p-3.5 bg-white border border-slate-100 rounded-xl hover:shadow-md hover:border-indigo-200 hover:bg-slate-50/50 cursor-pointer transition-all duration-200 group">
+        <div data-material="${safeAttributeName}" onclick="openEditPriceModal(this.getAttribute('data-material'))" class="flex justify-between items-center p-3.5 bg-white border border-slate-100 rounded-xl hover:shadow-md hover:border-indigo-200 hover:bg-slate-50/50 cursor-pointer transition-all duration-200 group">
             <div class="flex items-center">
                  <span class="w-7 h-7 flex items-center justify-center bg-slate-100 text-slate-500 border border-slate-200 rounded-lg mr-3 text-xs font-bold shadow-sm group-hover:bg-indigo-50 group-hover:text-indigo-600 group-hover:border-indigo-100 transition-colors">
                     ${i+1}

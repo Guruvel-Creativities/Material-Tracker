@@ -16,9 +16,8 @@
 
     <style>
         #qr-reader { width: 100%; max-width: 400px; margin: 0 auto; border: none !important; }
-        #qr-reader video { width: 100% !important; height: auto !important; border-radius: 16px; }
+        #qr-reader video { width: 100% !important; height: auto !important; border-radius: 16px; object-fit: cover; }
         .scanning-text { text-align: center; margin-top: 12px; color: #4B5563; font-size: 14px; font-weight: 500; }
-        /* Smooth custom scrollbar for stock list */
         .custom-scroll::-webkit-scrollbar { width: 6px; }
         .custom-scroll::-webkit-scrollbar-track { background: #F3F4F6; border-radius: 10px; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 10px; }
@@ -29,7 +28,7 @@
 <body class="bg-slate-50 min-h-screen font-sans text-slate-800 antialiased">
 
     <div id="loginPage" class="fixed inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center z-50 p-4">
-        <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md border border-slate-100 text-center transform transition-all">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md mx-4 text-center">
             <div class="inline-flex p-3 bg-slate-50 rounded-2xl shadow-inner mb-4">
                 <img class="w-20 object-contain" src="https://raw.githubusercontent.com/Guruvel-Creativities/Material-Tracker/main/Logo.PNG" alt="Logo">
             </div>
@@ -101,7 +100,7 @@
 
         <div id="scannerSection" class="hidden bg-white rounded-2xl shadow-lg border border-slate-100 p-6 mb-6">
             <div class="p-4 bg-slate-50 rounded-xl border border-dashed border-slate-300">
-                <div id="qr-reader shadow-inner"></div>
+                <div id="qr-reader" class="shadow-inner"></div>
             </div>
             <div class="scanning-text flex items-center justify-center gap-2">
                 <span class="w-2 h-2 rounded-full bg-indigo-600 animate-ping"></span>
@@ -236,13 +235,12 @@ function renderStock() {
     const totalItemsBadge = document.getElementById("totalItemsBadge");
     let entries = Object.entries(counted);
     
-    // Update structural status count metrics badge
     totalItemsBadge.innerText = `${entries.length} Unique Materials`;
     
     if (!entries.length) { 
         stockList.innerHTML = `
             <div class='text-center py-12 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-slate-400 font-medium text-sm'>
-                🔍 No synchronized inventory lines found matching filter criteria
+                🔍 No materials found matching filter criteria
             </div>`; 
         return; 
     }
@@ -265,36 +263,72 @@ function renderStock() {
                 <span class="text-slate-800 font-semibold tracking-tight text-sm">${m}</span>
             </div>
             <span class="bg-emerald-50 text-emerald-700 px-3.5 py-1.5 rounded-xl text-xs font-black tracking-wide border border-emerald-100 shadow-sm">
-                ${c} Pcs
+                ${c} Units
             </span>
         </div>`).join('');
 }
 
 /* HARDWARE PERIPHERAL & SCANNERS */
 async function startScanner(mode) {
-    if (isScanning) { stopScanner(); setTimeout(() => startScanner(mode), 300); return; }
+    if (isScanning) { 
+        await stopScanner(); 
+        setTimeout(() => startScanner(mode), 300); 
+        return; 
+    }
+    
     currentScanMode = mode;
     document.getElementById('scannerSection').classList.remove('hidden');
-    html5QrCode = new Html5Qrcode("qr-reader");
-    const config = { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 };
-    await html5QrCode.start({ facingMode: "environment" }, config, (text) => handleScan(text, mode));
-    isScanning = true;
+    
+    // Tiny timeout ensures Tailwind renders the element so the engine can measure canvas dimensions accurately
+    setTimeout(async () => {
+        try {
+            html5QrCode = new Html5Qrcode("qr-reader");
+            const config = { fps: 15, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 };
+            
+            // Primary environment try statement with a built-in standard constraint device fallback
+            await html5QrCode.start(
+                { facingMode: "environment" }, 
+                config, 
+                (text) => handleScan(text, mode)
+            );
+            isScanning = true;
+        } catch (err) {
+            console.warn("Environment camera missing, dropping back to standard inputs:", err);
+            try {
+                await html5QrCode.start(
+                    { facingMode: "user" }, 
+                    config, 
+                    (text) => handleScan(text, mode)
+                );
+                isScanning = true;
+            } catch (fallbackErr) {
+                alert("Camera access error: Check your browser permission settings.");
+                document.getElementById('scannerSection').classList.add('hidden');
+            }
+        }
+    }, 150);
 }
 
 async function handleScan(serial, mode) {
-    if (html5QrCode && isScanning) { await html5QrCode.stop(); isScanning = false; }
-    document.getElementById('scannerSection').classList.add('hidden');
     serial = serial.trim().toUpperCase();
-    if (!serial.startsWith("ID")) return alert("Invalid tracking serialization token framework syntax");
+    if (!serial.startsWith("ID")) {
+        alert("Invalid QR");
+        return;
+    }
+    
+    if (html5QrCode && isScanning) { 
+        await stopScanner(); 
+    }
+    
     if (mode === "add") {
-        if (stock[serial]) return alert("Target serialization signature node matrix code already mapped inside runtime ecosystem registry");
+        if (stock[serial]) return alert("Already exists");
         const name = prompt("Enter material name:");
         if (!name) return;
         await db.collection("materials").doc(serial).set({ material: name.trim() });
         await db.collection("history").add({ serial, material: name.trim(), type: "Add", date: new Date(), timestamp: firebase.firestore.FieldValue.serverTimestamp() });
     } else {
-        if (!stock[serial]) return alert("No associated item registry link recorded configuration matrix data signature lookup index mapping profiles matches specified entry identity profile");
-        if (confirm(`Confirm inventory modification withdrawal logic authorization action tracking sequence: Remove ${stock[serial]}?`)) {
+        if (!stock[serial]) return alert("Not found");
+        if (confirm(`Remove ${stock[serial]}?`)) {
             const name = stock[serial];
             await db.collection("materials").doc(serial).delete();
             await db.collection("history").add({ serial, material: name, type: "Consume", date: new Date(), timestamp: firebase.firestore.FieldValue.serverTimestamp() });
@@ -303,7 +337,16 @@ async function handleScan(serial, mode) {
 }
 
 async function stopScanner() {
-    if (html5QrCode && isScanning) { try { await html5QrCode.stop(); html5QrCode.clear(); } catch(e){} }
+    if (html5QrCode) { 
+        try { 
+            if (html5QrCode.isScanning) {
+                await html5QrCode.stop(); 
+            }
+            html5QrCode.clear(); 
+        } catch(e) {
+            console.error("Scanner close error cleanup catch:", e);
+        } 
+    }
     isScanning = false;
     document.getElementById('scannerSection').classList.add('hidden');
 }
@@ -327,9 +370,9 @@ function exportCSV() {
     XLSX.writeFile(wb, "Inventory_History.csv");
 }
 
-/* VECTOR GRAPHIC AND PORTABLE STORAGE PARSING UTILITIES */
+/* VECTOR GRAPHIC GENERATION */
 async function generateQR() {
-    const count = parseInt(prompt("Specify serial generation batch index limit value parameter structural scope size request metric:"));
+    const count = parseInt(prompt("How many QR codes do you want to generate?"));
     if (!count || count < 1) return;
     const snap = await db.collection("settings").doc("qr").get();
     let last = snap.exists ? (snap.data().lastNumber || 940) : 940;

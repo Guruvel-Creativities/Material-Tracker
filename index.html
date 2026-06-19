@@ -25,7 +25,7 @@
     </style>
 </head>
 
-<body class="bg-slate-50 min-h-screen font-sans text-slate-800 antialiased">
+<body class="bg-slate-50 min-h-screen font-sans text-slate-800 antialiased relative">
 
     <div id="loginPage" class="fixed inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center z-50 p-4">
         <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md mx-4 text-center">
@@ -58,7 +58,7 @@
         </div>
     </div>
 
-    <div id="mainApp" class="max-w-4xl mx-auto hidden pt-4 pb-12">
+    <div id="mainApp" class="max-w-4xl mx-auto hidden pt-4 pb-12 px-4">
         
         <div class="bg-white rounded-2xl shadow-md border border-slate-100 p-6 mb-6 relative overflow-hidden">
             <div class="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
@@ -78,22 +78,27 @@
             </div>
             
             <div class="flex flex-wrap gap-3 mb-6">
-                <button onclick="generateQR()" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-semibold text-sm rounded-xl shadow-sm shadow-indigo-100 transition-all flex items-center gap-1.5">🖨️ Generate QR</button>
+                <button onclick="openQRCountModal()" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-semibold text-sm rounded-xl shadow-sm shadow-indigo-100 transition-all flex items-center gap-1.5">🖨️ Generate QR</button>
                 <button onclick="startScanner('add')" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-semibold text-sm rounded-xl shadow-sm shadow-emerald-100 transition-all flex items-center gap-1.5">📥 Add Item</button>
                 <button onclick="startScanner('consume')" class="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-semibold text-sm rounded-xl shadow-sm shadow-rose-100 transition-all flex items-center gap-1.5">📤 Consume Item</button>
             </div>
             
+            <div class="flex border-b border-slate-200 mb-5 gap-2">
+                <button id="tabStock" onclick="switchTab('stock')" class="py-2.5 px-4 font-bold text-sm text-indigo-600 border-b-2 border-indigo-600 transition-all">📦 Stock Ledger</button>
+                <button id="tabPrice" onclick="switchTab('price')" class="py-2.5 px-4 font-semibold text-sm text-slate-500 border-b-2 border-transparent hover:text-slate-700 transition-all">💰 Price Matrix</button>
+            </div>
+
             <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <div class="relative md:col-span-3">
                     <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                     </span>
-                    <input id="searchInput" oninput="renderStock()" placeholder="Search connected inventory materials..." class="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white text-sm font-medium transition-all">
+                    <input id="searchInput" oninput="renderActiveTab()" placeholder="Search connected inventory materials..." class="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white text-sm font-medium transition-all">
                 </div>
-                <select id="sortStockSelect" onchange="renderStock()" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white font-semibold text-sm text-slate-700 transition-all cursor-pointer">
+                <select id="sortStockSelect" onchange="renderActiveTab()" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white font-semibold text-sm text-slate-700 transition-all cursor-pointer">
                     <option value="Alpha">🔤 Alphabetical (A-Z)</option>
-                    <option value="QtyDesc">📈 Qty: High to Low</option>
-                    <option value="QtyAsc">📉 Qty: Low to High</option>
+                    <option value="QtyDesc">📈 Metric: High to Low</option>
+                    <option value="QtyAsc">📉 Metric: Low to High</option>
                 </select>
             </div>
         </div>
@@ -111,12 +116,28 @@
             </div>
         </div>
 
-        <div class="bg-white rounded-2xl shadow-md border border-slate-100 p-6 mb-6">
-            <div class="flex justify-between items-center mb-4">
+        <div id="viewStockContainer" class="bg-white rounded-2xl shadow-md border border-slate-100 p-6 mb-6">
+            <div class="flex flex-wrap justify-between items-center gap-2 mb-4">
                 <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">📦 Current On-Hand Stock</h2>
-                <span id="totalItemsBadge" class="text-xs bg-slate-100 text-slate-600 px-2.5 py-1 rounded-md font-bold border border-slate-200">Metrics Real-Time</span>
+                <div class="flex items-center gap-2">
+                    <span id="valuationBadge" class="text-xs bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-md font-extrabold border border-indigo-100 shadow-sm">Valuation: 0 Rs</span>
+                    <span id="totalItemsBadge" class="text-xs bg-slate-100 text-slate-600 px-2.5 py-1 rounded-md font-bold border border-slate-200">0 Unique Materials</span>
+                </div>
             </div>
             <div id="stockList" class="space-y-2.5 max-h-[26rem] overflow-y-auto pr-1 custom-scroll"></div>
+        </div>
+
+        <div id="viewPriceContainer" class="hidden bg-white rounded-2xl shadow-md border border-slate-100 p-6 mb-6">
+            <div class="flex justify-between items-center mb-4">
+                <div>
+                    <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">💰 Base Price Configuration Matrix</h2>
+                    <p class="text-xs text-slate-500 font-medium">Click on any material to change or specify its unit rate parameters</p>
+                </div>
+                <button onclick="openNewPriceModal()" class="px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs rounded-xl border border-indigo-100 transition-all shadow-sm">
+                    + Set New Price Line
+                </button>
+            </div>
+            <div id="priceList" class="space-y-2.5 max-h-[26rem] overflow-y-auto pr-1 custom-scroll"></div>
         </div>
 
         <div class="bg-white rounded-2xl shadow-md border border-slate-100 p-6">
@@ -147,6 +168,72 @@
         </div>
     </div>
 
+    <div id="modalPriceOverlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl border border-slate-100 w-full max-w-sm p-6 transform transition-all animate-in fade-in zoom-in-95 duration-150">
+            <h3 id="modalPriceTitle" class="text-base font-extrabold text-slate-900 tracking-tight mb-1">Update Unit Rate</h3>
+            <p id="modalPriceSubtitle" class="text-xs text-slate-500 mb-4"></p>
+            
+            <div class="space-y-3">
+                <div id="modalPriceNameField" class="hidden">
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Material Name</label>
+                    <input type="text" id="modalPriceMatNameInput" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Price per Unit (Rs)</label>
+                    <input type="number" id="modalPriceRateInput" placeholder="0.00" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+            </div>
+            
+            <div class="flex justify-end gap-2 mt-5">
+                <button onclick="closePriceModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold text-xs rounded-xl transition-all">Cancel</button>
+                <button id="modalPriceDeleteBtn" onclick="submitPriceDelete()" class="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-xs rounded-xl border border-rose-100 transition-all hidden">Delete Price</button>
+                <button onclick="submitPriceSave()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition-all shadow-sm shadow-indigo-100">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalAddNameOverlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl border border-slate-100 w-full max-w-sm p-6">
+            <h3 class="text-base font-extrabold text-slate-900 tracking-tight mb-1">New Serial Registry</h3>
+            <p id="modalAddNameSerialTxt" class="text-xs text-indigo-600 font-mono font-bold mb-4"></p>
+            <div>
+                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Assign Material Name</label>
+                <input type="text" id="modalAddMatNameInput" placeholder="e.g. TP4056" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div class="flex justify-end gap-2 mt-5">
+                <button onclick="closeAddNameModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold text-xs rounded-xl transition-all">Cancel</button>
+                <button onclick="submitAddNameSave()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-sm">Save Register</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalConfirmOverlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl border border-slate-100 w-full max-w-sm p-6 text-center">
+            <div class="w-12 h-12 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto mb-3 font-bold text-lg">⚠️</div>
+            <h3 id="modalConfirmTitle" class="text-base font-extrabold text-slate-900 tracking-tight mb-1">Confirm Inventory Change</h3>
+            <p id="modalConfirmBody" class="text-xs text-slate-500 mb-5"></p>
+            <div class="flex justify-center gap-2">
+                <button onclick="closeConfirmModal(false)" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold text-xs rounded-xl transition-all">Cancel</button>
+                <button onclick="closeConfirmModal(true)" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition-all shadow-sm">Authorize Removal</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalQRGenOverlay" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl border border-slate-100 w-full max-w-sm p-6">
+            <h3 class="text-base font-extrabold text-slate-900 tracking-tight mb-1">Print Batch QR Codes</h3>
+            <p class="text-xs text-slate-500 mb-4">Specify your desired structural allocation target quantity</p>
+            <div>
+                <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Count limit</label>
+                <input type="number" id="modalQRCountInput" value="20" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div class="flex justify-end gap-2 mt-5">
+                <button onclick="closeQRCountModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold text-xs rounded-xl transition-all">Cancel</button>
+                <button onclick="submitQRGeneration()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition-all shadow-sm">Compile PDF</button>
+            </div>
+        </div>
+    </div>
+
 <script>
 /* FIREBASE CONFIGURATION */
 firebase.initializeApp({
@@ -157,11 +244,47 @@ firebase.initializeApp({
 const db = firebase.firestore();
 const auth = firebase.auth();
 
-let stock = {}, history = [];
+let stock = {}, priceMatrix = {}, history = [];
+let currentTab = 'stock';
 let currentScanMode = null;
 let html5QrCode = null;
 let isScanning = false;
 let logoutTimer;
+
+// Temporary parameters for modal flow
+let activeModalMaterial = "";
+let activeModalSerial = "";
+let confirmationPromiseResolve = null;
+
+/* TAB VIEW SYSTEM NAVIGATION */
+function switchTab(tabId) {
+    currentTab = tabId;
+    
+    const isStock = tabId === 'stock';
+    document.getElementById('viewStockContainer').classList.toggle('hidden', !isStock);
+    document.getElementById('viewPriceContainer').classList.toggle('hidden', isStock);
+    
+    const tabStock = document.getElementById('tabStock');
+    const tabPrice = document.getElementById('tabPrice');
+    
+    if (isStock) {
+        tabStock.className = "py-2.5 px-4 font-bold text-sm text-indigo-600 border-b-2 border-indigo-600 transition-all";
+        tabPrice.className = "py-2.5 px-4 font-semibold text-sm text-slate-500 border-b-2 border-transparent hover:text-slate-700 transition-all";
+    } else {
+        tabStock.className = "py-2.5 px-4 font-semibold text-sm text-slate-500 border-b-2 border-transparent hover:text-slate-700 transition-all";
+        tabPrice.className = "py-2.5 px-4 font-bold text-sm text-indigo-600 border-b-2 border-indigo-600 transition-all";
+    }
+    
+    renderActiveTab();
+}
+
+function renderActiveTab() {
+    if (currentTab === 'stock') {
+        renderStock();
+    } else {
+        renderPrices();
+    }
+}
 
 /* SESSION MANAGEMENT SYSTEM */
 function resetLogoutTimer() {
@@ -216,16 +339,19 @@ auth.onAuthStateChanged(user => {
     if (user) { loadData(); resetLogoutTimer(); }
 });
 
-/* RETRIEVAL AND PRESENTATION LOGIC */
+/* DATA MATRIX EXTENDS SYNC PIPELINES */
 function loadData() {
-    db.collection("materials").onSnapshot(s => { stock = {}; s.forEach(d => stock[d.id] = d.data().material); renderStock(); });
+    db.collection("materials").onSnapshot(s => { stock = {}; s.forEach(d => stock[d.id] = d.data().material); renderActiveTab(); });
+    db.collection("prices").onSnapshot(s => { priceMatrix = {}; s.forEach(d => priceMatrix[d.id.toLowerCase().trim()] = d.data().rate); renderActiveTab(); });
     db.collection("history").orderBy("date", "desc").onSnapshot(s => { history = []; s.forEach(d => history.push(d.data())); });
 }
 
+/* STOCK LEDGER VIEW */
 function renderStock() {
     const term = document.getElementById("searchInput").value.toLowerCase();
     const sortBy = document.getElementById("sortStockSelect").value;
     let counted = {};
+    let totalValuation = 0;
     
     Object.values(stock).forEach(m => { 
         if(m.toLowerCase().includes(term)) counted[m] = (counted[m] || 0) + 1; 
@@ -233,11 +359,18 @@ function renderStock() {
     
     const stockList = document.getElementById("stockList");
     const totalItemsBadge = document.getElementById("totalItemsBadge");
+    const valuationBadge = document.getElementById("valuationBadge");
     let entries = Object.entries(counted);
     
-    totalItemsBadge.innerText = `${entries.length} Unique Materials`;
+    Object.entries(counted).forEach(([m, qty]) => {
+        const matchingPrice = priceMatrix[m.toLowerCase().trim()] || 0;
+        totalValuation += (matchingPrice * qty);
+    });
     
-    if (!entries.length) { 
+    totalItemsBadge.innerText = `${entries.length} Unique Materials`;
+    valuationBadge.innerText = `Valuation: ${totalValuation} Rs`;
+    
+    if (!entries.length) {
         stockList.innerHTML = `
             <div class='text-center py-12 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-slate-400 font-medium text-sm'>
                 🔍 No materials found matching filter criteria
@@ -245,7 +378,6 @@ function renderStock() {
         return; 
     }
     
-    /* APPLY EXPLICIT SORT ROUTINES */
     if (sortBy === "Alpha") {
         entries.sort((a, b) => a[0].localeCompare(b[0]));
     } else if (sortBy === "QtyDesc") {
@@ -254,18 +386,179 @@ function renderStock() {
         entries.sort((a, b) => a[1] - b[1]);
     }
     
-    stockList.innerHTML = entries.map(([m, c], i) => `
+    stockList.innerHTML = entries.map(([m, c], i) => {
+        const itemPrice = priceMatrix[m.toLowerCase().trim()];
+        const displayPrice = itemPrice !== undefined ? `${itemPrice} Rs/Unit` : `No Price Set`;
+        return `
         <div class="flex justify-between items-center p-3.5 bg-white border border-slate-100 rounded-xl hover:shadow-md hover:border-slate-200 hover:-translate-y-0.5 transition-all duration-200 group">
             <div class="flex items-center">
                 <span class="w-7 h-7 flex items-center justify-center bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-lg mr-3 text-xs font-bold shadow-sm group-hover:bg-indigo-600 group-hover:text-white group-hover:border-indigo-600 transition-colors">
                     ${i+1}
                 </span>
-                <span class="text-slate-800 font-semibold tracking-tight text-sm">${m}</span>
+                <div>
+                    <span class="text-slate-800 font-semibold tracking-tight text-sm block">${m}</span>
+                    <span class="text-xs text-slate-400 font-medium">${displayPrice}</span>
+                </div>
             </div>
             <span class="bg-emerald-50 text-emerald-700 px-3.5 py-1.5 rounded-xl text-xs font-black tracking-wide border border-emerald-100 shadow-sm">
                 ${c} Units
             </span>
-        </div>`).join('');
+        </div>`;
+    }).join('');
+}
+
+/* PRICE CONFIGURATION MODAL DISPATCH LOGIC */
+function renderPrices() {
+    const term = document.getElementById("searchInput").value.toLowerCase();
+    const priceList = document.getElementById("priceList");
+    
+    let dynamicNames = new Set();
+    Object.values(stock).forEach(name => dynamicNames.add(name.trim()));
+    Object.keys(priceMatrix).forEach(name => {
+        const matchedStockName = Object.values(stock).find(s => s.toLowerCase().trim() === name.toLowerCase().trim());
+        dynamicNames.add(matchedStockName || name);
+    });
+    
+    let entries = Array.from(dynamicNames).filter(name => name.toLowerCase().includes(term));
+    entries.sort((a, b) => a.localeCompare(b));
+    
+    if (!entries.length) {
+        priceList.innerHTML = `
+            <div class='text-center py-12 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-slate-400 font-medium text-sm'>
+                🔍 No active materials indexed inside workspace profile
+            </div>`;
+        return;
+    }
+    
+    priceList.innerHTML = entries.map((name, i) => {
+        const actualValue = priceMatrix[name.toLowerCase().trim()];
+        const viewRateDisplay = actualValue !== undefined ? `${actualValue} Rs` : `<span class="text-amber-500 font-medium">Click to set</span>`;
+        return `
+        <div onclick="openEditPriceModal('${name}')" class="flex justify-between items-center p-3.5 bg-white border border-slate-100 rounded-xl hover:shadow-md hover:border-indigo-200 hover:bg-slate-50/50 cursor-pointer transition-all duration-200 group">
+            <div class="flex items-center">
+                <span class="w-7 h-7 flex items-center justify-center bg-slate-100 text-slate-500 border border-slate-200 rounded-lg mr-3 text-xs font-bold shadow-sm group-hover:bg-indigo-50 group-hover:text-indigo-600 group-hover:border-indigo-100 transition-colors">
+                    ${i+1}
+                </span>
+                <span class="text-slate-800 font-semibold tracking-tight text-sm">${name}</span>
+            </div>
+            <div class="flex items-center gap-3">
+                <span class="bg-slate-50 text-slate-700 px-3.5 py-1.5 rounded-xl text-xs font-bold border border-slate-200 shadow-sm group-hover:border-indigo-100 group-hover:bg-indigo-50 transition-all">
+                    ${viewRateDisplay}
+                </span>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+/* NATIVE IN-APP MODAL WINDOW WORKFLOWS */
+function openEditPriceModal(materialName) {
+    activeModalMaterial = materialName;
+    const currentRate = priceMatrix[materialName.toLowerCase().trim()] || "";
+    
+    document.getElementById("modalPriceTitle").innerText = "Update Unit Rate";
+    document.getElementById("modalPriceSubtitle").innerText = `Configure item cost metrics for: ${materialName}`;
+    document.getElementById("modalPriceNameField").classList.add("hidden");
+    
+    const deleteBtn = document.getElementById("modalPriceDeleteBtn");
+    if (currentRate !== "") deleteBtn.classList.remove("hidden");
+    else deleteBtn.classList.add("hidden");
+    
+    const rateInput = document.getElementById("modalPriceRateInput");
+    rateInput.value = currentRate;
+    
+    document.getElementById("modalPriceOverlay").classList.remove("hidden");
+    rateInput.focus();
+}
+
+function openNewPriceModal() {
+    activeModalMaterial = "";
+    document.getElementById("modalPriceTitle").innerText = "Set New Price Line";
+    document.getElementById("modalPriceSubtitle").innerText = "Assign financial baseline values to an independent item type";
+    document.getElementById("modalPriceNameField").classList.remove("hidden");
+    document.getElementById("modalPriceDeleteBtn").classList.add("hidden");
+    
+    document.getElementById("modalPriceMatNameInput").value = "";
+    document.getElementById("modalPriceRateInput").value = "";
+    
+    document.getElementById("modalPriceOverlay").classList.remove("hidden");
+    document.getElementById("modalPriceMatNameInput").focus();
+}
+
+function closePriceModal() {
+    document.getElementById("modalPriceOverlay").classList.add("hidden");
+}
+
+async function submitPriceSave() {
+    let targetName = activeModalMaterial;
+    if (!targetName) {
+        targetName = document.getElementById("modalPriceMatNameInput").value.trim();
+    }
+    
+    if (!targetName) return alert("Material name cannot be left blank");
+    
+    const rateVal = parseFloat(document.getElementById("modalPriceRateInput").value.trim());
+    if (isNaN(rateVal) || rateVal < 0) return alert("Provide a valid non-negative numerical rate.");
+    
+    await db.collection("prices").doc(targetName.toLowerCase().trim()).set({ rate: rateVal });
+    closePriceModal();
+}
+
+async function submitPriceDelete() {
+    if (activeModalMaterial && confirm(`Do you want to delete the price entry for ${activeModalMaterial}?`)) {
+        await db.collection("prices").doc(activeModalMaterial.toLowerCase().trim()).delete();
+        closePriceModal();
+    }
+}
+
+// Custom Promises for intercepting Scan Logic flows inside DOM panels
+function openConfirmModal(message) {
+    document.getElementById("modalConfirmBody").innerText = message;
+    document.getElementById("modalConfirmOverlay").classList.remove("hidden");
+    return new Promise((resolve) => {
+        confirmationPromiseResolve = resolve;
+    });
+}
+
+function closeConfirmModal(outcome) {
+    document.getElementById("modalConfirmOverlay").classList.add("hidden");
+    if (confirmationPromiseResolve) confirmationPromiseResolve(outcome);
+}
+
+function openAddNameModal(serial) {
+    activeModalSerial = serial;
+    document.getElementById("modalAddNameSerialTxt").innerText = `Serial Token: ${serial}`;
+    document.getElementById("modalAddMatNameInput").value = "";
+    document.getElementById("modalAddNameOverlay").classList.remove("hidden");
+    document.getElementById("modalAddMatNameInput").focus();
+    return new Promise((resolve) => {
+        confirmationPromiseResolve = resolve;
+    });
+}
+
+function closeAddNameModal() {
+    document.getElementById("modalAddNameOverlay").classList.add("hidden");
+    if (confirmationPromiseResolve) confirmationPromiseResolve(null);
+}
+
+async function submitAddNameSave() {
+    const enteredName = document.getElementById("modalAddMatNameInput").value.trim();
+    if (!enteredName) return alert("Name entry is required.");
+    
+    document.getElementById("modalAddNameOverlay").classList.add("hidden");
+    if (confirmationPromiseResolve) confirmationPromiseResolve(enteredName);
+}
+
+function openQRCountModal() {
+    document.getElementById("modalQRGenOverlay").classList.remove("hidden");
+    document.getElementById("modalQRCountInput").focus();
+}
+function closeQRCountModal() {
+    document.getElementById("modalQRGenOverlay").classList.add("hidden");
+}
+function submitQRGeneration() {
+    const val = parseInt(document.getElementById("modalQRCountInput").value);
+    closeQRCountModal();
+    if(val && val > 0) runQRGenerationEngine(val);
 }
 
 /* HARDWARE PERIPHERAL & SCANNERS */
@@ -279,27 +572,17 @@ async function startScanner(mode) {
     currentScanMode = mode;
     document.getElementById('scannerSection').classList.remove('hidden');
     
-    // Tiny timeout ensures Tailwind renders the element so the engine can measure canvas dimensions accurately
     setTimeout(async () => {
         try {
             html5QrCode = new Html5Qrcode("qr-reader");
             const config = { fps: 15, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 };
             
-            // Primary environment try statement with a built-in standard constraint device fallback
-            await html5QrCode.start(
-                { facingMode: "environment" }, 
-                config, 
-                (text) => handleScan(text, mode)
-            );
+            await html5QrCode.start({ facingMode: "environment" }, config, (text) => handleScan(text, mode));
             isScanning = true;
         } catch (err) {
-            console.warn("Environment camera missing, dropping back to standard inputs:", err);
+            console.warn("Camera fallback route trigger activated.", err);
             try {
-                await html5QrCode.start(
-                    { facingMode: "user" }, 
-                    config, 
-                    (text) => handleScan(text, mode)
-                );
+                await html5QrCode.start({ facingMode: "user" }, config, (text) => handleScan(text, mode));
                 isScanning = true;
             } catch (fallbackErr) {
                 alert("Camera access error: Check your browser permission settings.");
@@ -311,24 +594,25 @@ async function startScanner(mode) {
 
 async function handleScan(serial, mode) {
     serial = serial.trim().toUpperCase();
-    if (!serial.startsWith("ID")) {
-        alert("Invalid QR");
-        return;
-    }
+    if (!serial.startsWith("ID")) return alert("Invalid QR");
     
-    if (html5QrCode && isScanning) { 
-        await stopScanner(); 
-    }
+    if (html5QrCode && isScanning) await stopScanner();
     
     if (mode === "add") {
         if (stock[serial]) return alert("Already exists");
-        const name = prompt("Enter material name:");
+        
+        // Wait for the native modern modal instead of a browser prompt box
+        const name = await openAddNameModal(serial);
         if (!name) return;
-        await db.collection("materials").doc(serial).set({ material: name.trim() });
-        await db.collection("history").add({ serial, material: name.trim(), type: "Add", date: new Date(), timestamp: firebase.firestore.FieldValue.serverTimestamp() });
+        
+        await db.collection("materials").doc(serial).set({ material: name });
+        await db.collection("history").add({ serial, material: name, type: "Add", date: new Date(), timestamp: firebase.firestore.FieldValue.serverTimestamp() });
     } else {
         if (!stock[serial]) return alert("Not found");
-        if (confirm(`Remove ${stock[serial]}?`)) {
+        
+        // Intercept action via custom in-app choice container confirmation modal
+        const confirmDelete = await openConfirmModal(`Are you sure you want to withdraw ${stock[serial]} from active inventory storage limits?`);
+        if (confirmDelete) {
             const name = stock[serial];
             await db.collection("materials").doc(serial).delete();
             await db.collection("history").add({ serial, material: name, type: "Consume", date: new Date(), timestamp: firebase.firestore.FieldValue.serverTimestamp() });
@@ -339,13 +623,9 @@ async function handleScan(serial, mode) {
 async function stopScanner() {
     if (html5QrCode) { 
         try { 
-            if (html5QrCode.isScanning) {
-                await html5QrCode.stop(); 
-            }
+            if (html5QrCode.isScanning) await html5QrCode.stop(); 
             html5QrCode.clear(); 
-        } catch(e) {
-            console.error("Scanner close error cleanup catch:", e);
-        } 
+        } catch(e) { console.error(e); } 
     }
     isScanning = false;
     document.getElementById('scannerSection').classList.add('hidden');
@@ -371,9 +651,7 @@ function exportCSV() {
 }
 
 /* VECTOR GRAPHIC GENERATION */
-async function generateQR() {
-    const count = parseInt(prompt("How many QR codes do you want to generate?"));
-    if (!count || count < 1) return;
+async function runQRGenerationEngine(count) {
     const snap = await db.collection("settings").doc("qr").get();
     let last = snap.exists ? (snap.data().lastNumber || 940) : 940;
     const { jsPDF } = window.jspdf;
